@@ -1,0 +1,4 @@
+{
+  "apiUrl": "https://prod.api.example.com",
+  "featureFlag": false
+}

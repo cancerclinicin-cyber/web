@@ -1,4 +1,5 @@
 {
-  "apiUrl": "https://prod.api.example.com",
+  "APPLICATION_TITLE": "PROD",
+  "APLURL": "https://prod.api.example.com",
   "featureFlag": false
 }

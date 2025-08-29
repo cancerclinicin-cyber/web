@@ -9,6 +9,12 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
+function askQuestion(query: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(query, (ans) => resolve(ans.trim()));
+  });
+}
+
 function createComponent(basePath: string, componentName: string) {
   const filePath = path.join(basePath, `${componentName}.tsx`);
   const cssFileName = `${componentName}.module.css`;
@@ -27,8 +33,9 @@ export default function ${componentName}() {
   fs.writeFileSync(filePath, componentCode);
   console.log(`✅ Component "${componentName}" created at ${filePath}`);
 
-  // Also create CSS module file when generating component
   createStyle(basePath, componentName);
+  createConstant(basePath, componentName);
+  createModel(basePath, componentName);
 }
 
 function createStyle(basePath: string, componentName: string) {
@@ -40,6 +47,28 @@ function createStyle(basePath: string, componentName: string) {
 `;
   fs.writeFileSync(stylePath, styleCode);
   console.log(`🎨 Style file created at ${stylePath}`);
+}
+
+function createConstant(basePath: string, componentName: string) {
+  const constantPath = path.join(basePath, `${componentName}.constant.ts`);
+  const constantCode = `// Constants for ${componentName}
+
+export const ${componentName.toUpperCase()}_TITLE = '${componentName} works';
+`;
+  fs.writeFileSync(constantPath, constantCode);
+  console.log(`📦 Constant file created at ${constantPath}`);
+}
+
+function createModel(basePath: string, componentName: string) {
+  const modelPath = path.join(basePath, `${componentName}.model.ts`);
+  const modelCode = `// Model definitions for ${componentName}
+
+export interface ${componentName}Props {
+  // Define props here
+}
+`;
+  fs.writeFileSync(modelPath, modelCode);
+  console.log(`📐 Model file created at ${modelPath}`);
 }
 
 function createHelper(basePath: string, helperName: string) {
@@ -54,12 +83,6 @@ export const exampleHelper = () => {
   console.log(`🛠️ Helper file created at ${helperPath}`);
 }
 
-function askQuestion(query: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(query, (ans) => resolve(ans.trim()));
-  });
-}
-
 async function main() {
   try {
     const fileType = await askQuestion('What do you want to create? (component, style, helper): ');
@@ -69,7 +92,7 @@ async function main() {
       process.exit(1);
     }
 
-    const inputPath = await askQuestion('Enter the full path relative to src (e.g., components/Home/Home): ');
+    const inputPath = await askQuestion('Enter the full path relative to src (e.g., components/Login/Login): ');
     if (!inputPath) {
       console.error('❌ Path is required');
       rl.close();
@@ -94,7 +117,7 @@ async function main() {
         break;
     }
   } catch (error) {
-    console.error('Error:', error);
+    console.error('🚨 Error:', error);
   } finally {
     rl.close();
   }

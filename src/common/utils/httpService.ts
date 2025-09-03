@@ -1,9 +1,10 @@
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import axios from "axios";
+import config from "../../../configLoader";
 
 // Create an Axios instance with default config
 const instance = axios.create({
-  baseURL: "https://api.escuelajs.co/api/v1",
+  baseURL: config.APLURL,
   headers: {
     "Content-Type": "application/json",
   },

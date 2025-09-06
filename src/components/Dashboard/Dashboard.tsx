@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { 
-  Calendar, Users, CalendarDays, TrendingUp, 
-  User, Settings, LogOut, Key, Plus, ChevronDown
+import {
+  Calendar, Users, CalendarDays, TrendingUp,
+  Plus
 } from "lucide-react";
 import Header from "../Layouts/Header/Header";
 
@@ -13,14 +13,14 @@ const generateMonthlyData = () => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
   // Current year data (2024)
-  const currentYearData = months.map((month, index) => ({
+  const currentYearData = months.map((month) => ({
     month,
     patients: Math.floor(Math.random() * 40) + 30,
     appointments: Math.floor(Math.random() * 80) + 80
   }));
 
   // Previous year data (2023)
-  const previousYearData = months.map((month, index) => ({
+  const previousYearData = months.map((month) => ({
     month,
     patients: Math.floor(Math.random() * 30) + 20,
     appointments: Math.floor(Math.random() * 60) + 60
@@ -44,18 +44,11 @@ const menuItems = [
   { id: 'appointments', label: 'Appointments', icon: Calendar },
 ];
 
-const userMenuItems = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'change-password', label: 'Change Password', icon: Key },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'logout', label: 'Logout', icon: LogOut },
-];
 
 export default function OncologistDashboard() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState('normal-schedule');
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
   
   const { currentYearData, previousYearData } = generateMonthlyData();
@@ -270,7 +263,6 @@ export default function OncologistDashboard() {
                     />
                     <Legend />
                     <Bar dataKey="patients" fill="#3b82f6" name="2024 Patients" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="patients" fill="#93c5fd" name="2023 Patients" data={previousYearData} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -299,7 +291,6 @@ export default function OncologistDashboard() {
                     />
                     <Legend />
                     <Bar dataKey="appointments" fill="#10b981" name="2024 Appointments" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="appointments" fill="#6ee7b7" name="2023 Appointments" data={previousYearData} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

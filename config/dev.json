@@ -1,5 +1,7 @@
 {
   "APPLICATION_TITLE": "DEV",
   "APLURL": "https://dev-api.example.com",
+  "API_BASE_URL": "http://localhost:3000/api/v1",
+  "RAZORPAY_KEY": "rzp_test_1DP5mmOlF5G5ag",
   "featureFlag": true
 }

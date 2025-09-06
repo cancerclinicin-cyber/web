@@ -1,5 +1,5 @@
 {
-  "APPLICATION_TITLE": "PROD",
+  "APPLICATION_TITLE": "MediConnect - Medical Appointment System",
   "APLURL": "https://prod.api.example.com",
   "API_BASE_URL": "https://api.example.com/api/v1",
   "RAZORPAY_KEY": "rzp_live_your_production_key_here",

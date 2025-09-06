@@ -6,7 +6,7 @@ import type { RootState } from '../../../store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import {
   Calendar, Users, CalendarDays, TrendingUp, Plus, Clock,
-  DollarSign, Activity, CheckCircle
+  Activity
 } from "lucide-react";
 import Header from "../Layouts/Header/Header";
 import httpService from '../../common/utils/httpService';
@@ -137,10 +137,6 @@ export default function OncologistDashboard() {
     }
   }, [accessToken, selectedYear]);
 
-  // Calculate percentage changes (mock data for now)
-  const patientChange = "+12.5";
-  const appointmentChange = "+8.3";
-  const revenueChange = "+15.2";
 
   // Year options
   const currentYear = new Date().getFullYear();
@@ -236,112 +232,67 @@ export default function OncologistDashboard() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-auto relative z-10">
+      <main className="flex-1 p-3 md:p-6 overflow-auto relative z-10">
         <div className="max-w-7xl mx-auto">
 
-          {/* Enhanced Filters */}
-          <div className="flex flex-wrap gap-4 mb-8 items-center bg-gradient-to-r from-white to-gray-50 p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-green-600" />
-              </div>
-              <span className="text-gray-700 font-semibold text-lg">Filter by:</span>
+          {/* Compact Filter in Top Right */}
+          <div className="flex justify-end mb-4">
+            <div className="flex items-center gap-2 bg-white p-3 rounded-lg shadow-md border border-gray-200">
+              <Calendar className="h-4 w-4 text-green-600" />
+              <span className="text-gray-700 font-medium text-sm">Year:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+              >
+                {years.map((year) => (
+                  <option key={year.value} value={year.value}>
+                    {year.label}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-            >
-              {years.map((year) => (
-                <option key={year.value} value={year.value}>
-                  {year.label}
-                </option>
-              ))}
-            </select>
-
           </div>
           
           {/* Enhanced Medical Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              <div className="p-6">
-                <div className="flex items-center gap-3 text-blue-700 mb-3">
-                  <div className="p-2 bg-blue-500 rounded-lg">
-                    <Users className="h-5 w-5 text-white" />
+              <div className="p-4">
+                <div className="flex items-center gap-2 text-blue-700 mb-2">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Users className="h-4 w-4 text-white" />
                   </div>
-                  <p className="text-sm font-semibold">Total Patients</p>
+                  <p className="text-xs font-semibold">Total Patients</p>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 my-3">{stats.totalPatients}</h3>
-                <div className="flex items-center text-sm font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                  <span>{patientChange}% this month</span>
-                </div>
+                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 my-2">{stats.totalPatients}</h3>
               </div>
             </div>
 
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              <div className="p-6">
-                <div className="flex items-center gap-3 text-green-700 mb-3">
-                  <div className="p-2 bg-green-500 rounded-lg">
-                    <CalendarDays className="h-5 w-5 text-white" />
+              <div className="p-4">
+                <div className="flex items-center gap-2 text-green-700 mb-2">
+                  <div className="p-1.5 bg-green-500 rounded-lg">
+                    <CalendarDays className="h-4 w-4 text-white" />
                   </div>
-                  <p className="text-sm font-semibold">Today's Appointments</p>
+                  <p className="text-xs font-semibold">Today's Appointments</p>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 my-3">{stats.todaysAppointments}</h3>
-                <div className="flex items-center text-sm font-medium text-blue-600">
-                  <Clock className="h-4 w-4 mr-1" />
-                  <span>Scheduled today</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              <div className="p-6">
-                <div className="flex items-center gap-3 text-purple-700 mb-3">
-                  <div className="p-2 bg-purple-500 rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-white" />
-                  </div>
-                  <p className="text-sm font-semibold">Completed This Month</p>
-                </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 my-3">{stats.completedAppointments}</h3>
-                <div className="flex items-center text-sm font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                  <span>{appointmentChange}% from last month</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl shadow-lg border border-amber-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              <div className="p-6">
-                <div className="flex items-center gap-3 text-amber-700 mb-3">
-                  <div className="p-2 bg-amber-500 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-white" />
-                  </div>
-                  <p className="text-sm font-semibold">Monthly Revenue</p>
-                </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 my-3">₹{(stats.totalRevenue || 0).toLocaleString()}</h3>
-                <div className="flex items-center text-sm font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                  <span>{revenueChange}% from last month</span>
-                </div>
+                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 my-2">{stats.todaysAppointments}</h3>
               </div>
             </div>
           </div>
           
-          {/* Dashboard Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Monthly Trends Chart */}
+          {/* Full Width Monthly Trends Chart */}
+          <div className="mb-4">
             <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-lg border border-blue-200 overflow-hidden hover:shadow-xl transition-all duration-300">
-              <div className="p-6 border-b border-blue-200 bg-gradient-to-r from-blue-500 to-blue-600">
+              <div className="p-4 border-b border-blue-200 bg-gradient-to-r from-blue-500 to-blue-600">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   Monthly Trends
                 </h2>
                 <p className="text-sm text-blue-100 mt-1">Patient registrations and appointments</p>
               </div>
-              <div className="p-6">
-                <div className="h-80">
+              <div className="p-4">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -363,27 +314,30 @@ export default function OncologistDashboard() {
                 </div>
               </div>
             </div>
+          </div>
 
+          {/* Today's Schedule and Recent Appointments in Single Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Today's Schedule */}
             <div className="bg-gradient-to-br from-white to-green-50 rounded-xl shadow-lg border border-green-200 overflow-hidden hover:shadow-xl transition-all duration-300">
-              <div className="p-6 border-b border-green-200 bg-gradient-to-r from-green-500 to-green-600">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+              <div className="p-4 border-b border-green-200 bg-gradient-to-r from-green-500 to-green-600">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
                   Today's Schedule
                 </h2>
-                <p className="text-sm text-green-100 mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p className="text-xs text-green-100 mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
-              <div className="p-6">
-                <div className="space-y-3 max-h-80 overflow-y-auto">
+              <div className="p-4">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {todaysSchedule.length > 0 ? todaysSchedule.map((appointment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
                           {(appointment.patient_name || 'U').charAt(0)}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{appointment.patient_name || 'Unknown Patient'}</p>
-                          <p className="text-sm text-gray-500">{appointment.slot_time || 'N/A'}</p>
+                          <p className="font-medium text-gray-900 text-sm">{appointment.patient_name || 'Unknown Patient'}</p>
+                          <p className="text-xs text-gray-500">{appointment.slot_time || 'N/A'}</p>
                         </div>
                       </div>
                       <div className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -395,42 +349,39 @@ export default function OncologistDashboard() {
                       </div>
                     </div>
                   )) : (
-                    <div className="text-center py-8">
-                      <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">No appointments scheduled for today</p>
+                    <div className="text-center py-6">
+                      <Clock className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No appointments scheduled for today</p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Recent Activity and Revenue Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Recent Appointments */}
             <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-lg border border-purple-200 overflow-hidden hover:shadow-xl transition-all duration-300">
-              <div className="p-6 border-b border-purple-200 bg-gradient-to-r from-purple-500 to-purple-600">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
+              <div className="p-4 border-b border-purple-200 bg-gradient-to-r from-purple-500 to-purple-600">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
                   Recent Appointments
                 </h2>
-                <p className="text-sm text-purple-100 mt-1">Latest patient consultations</p>
+                <p className="text-xs text-purple-100 mt-1">Latest patient consultations</p>
               </div>
-              <div className="p-6">
-                <div className="space-y-3 max-h-80 overflow-y-auto">
+              <div className="p-4">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {recentAppointments.length > 0 ? recentAppointments.slice(0, 5).map((appointment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
                           {(appointment.patient?.first_name || 'U').charAt(0)}{(appointment.patient?.last_name || '').charAt(0)}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{appointment.patient?.first_name || 'Unknown'} {appointment.patient?.last_name || ''}</p>
-                          <p className="text-sm text-gray-500">{appointment.slot_date ? new Date(appointment.slot_date).toLocaleDateString() : 'N/A'}</p>
+                          <p className="font-medium text-gray-900 text-sm">{appointment.patient?.first_name || 'Unknown'} {appointment.patient?.last_name || ''}</p>
+                          <p className="text-xs text-gray-500">{appointment.slot_date ? new Date(appointment.slot_date).toLocaleDateString() : 'N/A'}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-gray-900">₹{(appointment.amount || 0).toLocaleString()}</p>
+                        <p className="font-medium text-gray-900 text-sm">₹{(appointment.amount || 0).toLocaleString()}</p>
                         <p className={`text-xs px-2 py-1 rounded-full ${
                           appointment.appointment_status === 'Completed' ? 'bg-green-100 text-green-800' :
                           appointment.appointment_status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
@@ -441,43 +392,11 @@ export default function OncologistDashboard() {
                       </div>
                     </div>
                   )) : (
-                    <div className="text-center py-8">
-                      <Activity className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">No recent appointments</p>
+                    <div className="text-center py-6">
+                      <Activity className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No recent appointments</p>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {/* Revenue Chart */}
-            <div className="bg-gradient-to-br from-white to-amber-50 rounded-xl shadow-lg border border-amber-200 overflow-hidden hover:shadow-xl transition-all duration-300">
-              <div className="p-6 border-b border-amber-200 bg-gradient-to-r from-amber-500 to-orange-600">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Revenue Overview
-                </h2>
-                <p className="text-sm text-amber-100 mt-1">Monthly revenue trends</p>
-              </div>
-              <div className="p-6">
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-                      <YAxis stroke="#64748b" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #f59e0b',
-                          borderRadius: '0.75rem',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                        }}
-                        formatter={(value) => [`₹${(value || 0).toLocaleString()}`, 'Revenue']}
-                      />
-                      <Bar dataKey="revenue" fill="#f59e0b" name="Revenue" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
                 </div>
               </div>
             </div>

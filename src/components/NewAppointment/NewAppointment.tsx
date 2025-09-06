@@ -1,9 +1,37 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { User, FileText, Clock, Upload, X, Check, CheckCircle } from "lucide-react";
+import { User, FileText, Clock, Upload, X, Check, CheckCircle, Calendar } from "lucide-react";
 import { differenceInYears } from "date-fns";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import config from "../../../configLoader";
+
+// Firefox-specific CSS fixes for datepicker
+const firefoxDatepickerStyles = `
+  @-moz-document url-prefix() {
+    .react-datepicker-wrapper {
+      width: 100% !important;
+    }
+    .react-datepicker__input-container input {
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .react-datepicker-popper {
+      z-index: 9999 !important;
+    }
+    .react-datepicker-calendar {
+      font-family: inherit !important;
+    }
+  }
+`;
+
+// Inject Firefox-specific styles
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = firefoxDatepickerStyles;
+  document.head.appendChild(style);
+}
 
 // Define types for API response
 interface AvailableSlot {
@@ -71,7 +99,10 @@ export default function NewAppointment() {
   const [bookingSuccessful, setBookingSuccessful] = useState(false);
   const [apiSubmitting, setApiSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [savingAppointment, setSavingAppointment] = useState(false);
   const [consultationPrice, setConsultationPrice] = useState(1500);
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
+  const [scheduleId, setScheduleId] = useState<number | null>(null);
   const pathologyRef = useRef<HTMLInputElement>(null);
   const radiologyRef = useRef<HTMLInputElement>(null);
   const additionalDocRef = useRef<HTMLInputElement>(null);
@@ -95,12 +126,19 @@ export default function NewAppointment() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
-    
+
+    let processedValue = value;
+
+    // For phone number field, only allow numeric characters
+    if (name === "phoneNumber") {
+      processedValue = value.replace(/\D/g, ''); // Remove all non-numeric characters
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value
+      [name]: type === "checkbox" ? checked : processedValue
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => {
@@ -109,7 +147,7 @@ export default function NewAppointment() {
         return newErrors;
       });
     }
-    
+
     // Reset slot selection when date changes
     if (name === "appointmentDate") {
       setFormData(prev => ({
@@ -118,7 +156,7 @@ export default function NewAppointment() {
       }));
       setAvailableSlots([]);
       setShowSlotSelection(false);
-      
+
       // Fetch slots when date is selected
       if (value) {
         fetchAvailableSlots(value);
@@ -181,8 +219,8 @@ export default function NewAppointment() {
       }
       if (!formData.phoneNumber.trim()) {
         newErrors.phoneNumber = "Phone number is required";
-      } else if (!/^\d{10}$/.test(formData.phoneNumber)) {
-        newErrors.phoneNumber = "Phone number must be 10 digits";
+      } else if (!/^[6-9]\d{9}$/.test(formData.phoneNumber)) {
+        newErrors.phoneNumber = "Phone number must be 10 digits and start with 6-9";
       }
       if (!formData.dateOfBirth) {
         newErrors.dateOfBirth = "Date of birth is required";
@@ -292,8 +330,11 @@ export default function NewAppointment() {
       currency: 'INR',
       name: 'Medical Appointment',
       description: 'Appointment Booking Payment',
-      handler: async function () {
+      handler: async function (response: { razorpay_payment_id?: string; razorpay_order_id?: string; razorpay_signature?: string }) {
         try {
+          // Show loading state for API saving
+          setSavingAppointment(true);
+
           // Call patient registration API again on Razorpay success
           const myHeaders = new Headers();
           myHeaders.append("Content-Type", "application/json");
@@ -331,12 +372,21 @@ export default function NewAppointment() {
           const formdata = new FormData();
           console.log('Current formData state:', formData); // Debug log
           console.log('Creating appointment with slot_time:', formData.appointmentSlot); // Debug log
+          console.log('Razorpay response:', response); // Debug log
+
           formdata.append("email", formData.email);
           formdata.append("phone_number", formData.phoneNumber);
-          formdata.append("slot_date", formData.appointmentDate);
-          formdata.append("slot_time", formData.appointmentSlot);
+          formdata.append("slot_date", formData.appointmentDate || "");
+          formdata.append("slot_time", formData.appointmentSlot || "");
+          formdata.append("schedule_id", scheduleId?.toString() || "");
           formdata.append("treatment_history", formData.medicalHistory);
           formdata.append("additional_details", formData.additionalDetails);
+
+          // Add payment details from Razorpay response
+          formdata.append("payment_id", response.razorpay_payment_id || "");
+          formdata.append("order_id", response.razorpay_order_id || "");
+          formdata.append("amount", consultationPrice.toString());
+          formdata.append("currency", "INR");
 
           // Add pathology uploads as array
           formData.pathologyReports.forEach((file) => {
@@ -369,10 +419,12 @@ export default function NewAppointment() {
           console.log("Appointment creation successful:", appointmentResult);
 
           setPaymentProcessing(false);
+          setSavingAppointment(false);
           setBookingSuccessful(true);
         } catch (error) {
           console.error('Error in payment success handler:', error);
           setPaymentProcessing(false);
+          setSavingAppointment(false);
           setApiError("Payment successful but appointment creation failed. Please contact support.");
         }
       },
@@ -412,7 +464,7 @@ export default function NewAppointment() {
       };
 
       const response = await fetch(
-        `${config.API_BASE_URL}/patients/patient_registrations/123/check_available_schedule?date=${dateString}&is_already_registered=false`,
+        `${config.API_BASE_URL}/patients/patient_registrations/123/check_available_schedule?date=${dateString}&is_already_registered=${isAlreadyRegistered}`,
         requestOptions
       );
 
@@ -432,6 +484,7 @@ export default function NewAppointment() {
 
       const result: ScheduleResponse = await response.json();
       setAvailableSlots(result.available_slots);
+      setScheduleId(result.id); // Store the schedule_id from API response
       setShowSlotSelection(true);
 
       if (result.available_slots.length === 0) {
@@ -503,8 +556,6 @@ export default function NewAppointment() {
     });
   };
 
-  // Get today's date in YYYY-MM-DD format for min attribute
-  const today = new Date().toISOString().split('T')[0];
 
   // Format date for user-friendly display
   const formatDate = (dateString: string) => {
@@ -527,6 +578,7 @@ export default function NewAppointment() {
   // Reset form and start over
   const handleReset = () => {
     setBookingSuccessful(false);
+    setSavingAppointment(false);
     setActiveTab("personal");
     setFormData({
       firstName: "",
@@ -549,6 +601,8 @@ export default function NewAppointment() {
     setAvailableSlots([]);
     setShowSlotSelection(false);
     setApiError("");
+    setIsAlreadyRegistered(false);
+    setScheduleId(null);
   };
 
   // Submit patient registration API
@@ -592,6 +646,9 @@ export default function NewAppointment() {
       // Store consultation price for Razorpay
       setConsultationPrice(result.consultation_price);
 
+      // Store is_already_registered status for slot availability check
+      setIsAlreadyRegistered(result.is_already_registered);
+
       // Move to next tab after successful API call
       const tabs = ["personal", "medical", "details", "appointment"];
       const currentIndex = tabs.indexOf(activeTab);
@@ -606,6 +663,36 @@ export default function NewAppointment() {
     }
   };
 
+  // Show loading overlay while saving appointment data
+  if (savingAppointment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-green-600 to-teal-600 p-8 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-white">Saving Your Appointment</h1>
+            <p className="text-green-100 mt-2">
+              Please wait while we process your appointment details...
+            </p>
+          </div>
+
+          <div className="p-8 text-center">
+            <div className="space-y-4">
+              <div className="flex items-center justify-center space-x-3">
+                <div className="animate-pulse w-3 h-3 bg-green-400 rounded-full"></div>
+                <div className="animate-pulse w-3 h-3 bg-green-400 rounded-full" style={{ animationDelay: '0.2s' }}></div>
+                <div className="animate-pulse w-3 h-3 bg-green-400 rounded-full" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+              <p className="text-gray-600 text-sm">
+                This may take a few moments. Please don't close this window.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show success message after booking
   if (bookingSuccessful) {
     return (
@@ -618,7 +705,7 @@ export default function NewAppointment() {
               Your appointment has been confirmed for {formatDate(formData.appointmentDate)} at {formData.appointmentSlot}
             </p>
           </div>
-          
+
           <div className="p-8">
             <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
               <h2 className="text-xl font-semibold text-green-800 mb-4">Appointment Details</h2>
@@ -641,7 +728,7 @@ export default function NewAppointment() {
                 </div>
               </div>
             </div>
-            
+
             <div className="text-center">
               <p className="text-gray-600 mb-6">
                 A confirmation email has been sent to {formData.email}. Please check your inbox for further details.
@@ -777,9 +864,12 @@ export default function NewAppointment() {
                     <input
                       id="phoneNumber"
                       name="phoneNumber"
+                      type="tel"
                       value={formData.phoneNumber}
                       onChange={handleInputChange}
-                      placeholder="9061002008"
+                      placeholder="9876543210"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
                         errors.phoneNumber ? "border-red-500" : "border-gray-300"
                       }`}
@@ -811,24 +901,42 @@ export default function NewAppointment() {
                     <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
                       Date of Birth *
                     </label>
-                    <div className="relative">
-                      <input
+                    <div className="relative w-full">
+                      <DatePicker
                         id="dateOfBirth"
-                        name="dateOfBirth"
-                        type="date"
-                        max={today} // Allow today and past dates
-                        value={formData.dateOfBirth}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                        selected={formData.dateOfBirth ? new Date(formData.dateOfBirth) : null}
+                        onChange={(date) => {
+                          const event = {
+                            target: {
+                              name: 'dateOfBirth',
+                              value: date ? date.toISOString().split('T')[0] : ''
+                            }
+                          } as React.ChangeEvent<HTMLInputElement>;
+                          handleInputChange(event);
+                        }}
+                        dateFormat="dd/MM/yyyy"
+                        maxDate={new Date()}
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        yearDropdownItemNumber={50}
+                        scrollableYearDropdown
+                        placeholderText="Select date of birth"
+                        className={`w-full pl-3 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
                           errors.dateOfBirth ? "border-red-500" : "border-gray-300"
                         }`}
+                        popperClassName="react-datepicker-popper"
+                        wrapperClassName="w-full"
+                        calendarClassName="react-datepicker-calendar"
+                        portalId="root-portal"
                       />
-                      {formData.dateOfBirth && (
-                        <div className="mt-1 text-gray-600 text-xs">
-                          Selected: {formatDate(formData.dateOfBirth)}
-                        </div>
-                      )}
+                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10" />
                     </div>
+                    {formData.dateOfBirth && (
+                      <div className="mt-1 text-gray-600 text-xs">
+                        Selected: {formatDate(formData.dateOfBirth)}
+                      </div>
+                    )}
                     {errors.dateOfBirth && <p className="text-red-500 text-sm">{errors.dateOfBirth}</p>}
                   </div>
                   
@@ -1127,24 +1235,42 @@ export default function NewAppointment() {
                   <label htmlFor="appointmentDate" className="block text-sm font-medium text-gray-700">
                     Preferred Appointment Date *
                   </label>
-                  <div className="relative">
-                    <input
+                  <div className="relative w-full">
+                    <DatePicker
                       id="appointmentDate"
-                      name="appointmentDate"
-                      type="date"
-                      min={today} // Prevent past dates
-                      value={formData.appointmentDate}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      selected={formData.appointmentDate ? new Date(formData.appointmentDate) : null}
+                      onChange={(date) => {
+                        const event = {
+                          target: {
+                            name: 'appointmentDate',
+                            value: date ? date.toISOString().split('T')[0] : ''
+                          }
+                        } as React.ChangeEvent<HTMLInputElement>;
+                        handleInputChange(event);
+                      }}
+                      dateFormat="dd/MM/yyyy"
+                      minDate={new Date()}
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
+                      yearDropdownItemNumber={2}
+                      scrollableYearDropdown
+                      placeholderText="Select appointment date"
+                      className={`w-full pl-3 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                         errors.appointmentDate ? "border-red-500" : "border-gray-300"
                       }`}
+                      popperClassName="react-datepicker-popper"
+                      wrapperClassName="w-full"
+                      calendarClassName="react-datepicker-calendar"
+                      portalId="root-portal"
                     />
-                    {formData.appointmentDate && (
-                      <div className="mt-1 text-gray-600 text-xs">
-                        Selected: {formatDate(formData.appointmentDate)}
-                      </div>
-                    )}
+                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10" />
                   </div>
+                  {formData.appointmentDate && (
+                    <div className="mt-1 text-gray-600 text-xs">
+                      Selected: {formatDate(formData.appointmentDate)}
+                    </div>
+                  )}
                   {errors.appointmentDate && <p className="text-red-500 text-sm">{errors.appointmentDate}</p>}
                   <p className="text-xs text-gray-500">Select a date from today onwards</p>
                 </div>

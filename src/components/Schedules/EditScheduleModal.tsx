@@ -3,6 +3,8 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import { X } from 'lucide-react';
+import ErrorMessage from '../common/ErrorMessage';
+
 
 interface Schedule {
   id: number;
@@ -34,6 +36,8 @@ export default function EditScheduleModal({
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [loading, setLoading] = useState(false);
+  const [timeError, setTimeError] = useState('');
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
     if (isOpen && schedule) {
@@ -52,13 +56,24 @@ export default function EditScheduleModal({
   const handleSave = async () => {
     if (!schedule || !startTime || !endTime) return;
 
+    // Validate that start time is less than end time
+    if (startTime >= endTime) {
+      setTimeError('Start time must be earlier than end time');
+      return;
+    }
+
+    // Clear any previous errors
+    setTimeError('');
+    setApiError('');
+
     setLoading(true);
     try {
       await httpService.put(
-        'admin/schedules/update_by_day',
+        'admin/schedules/update_by_date/',
         {
-          day: schedule.day,
+          scheduled_date: new Date().toISOString().split('T')[0], // Today's date
           schedule: {
+            id: schedule.id,
             start_time: startTime + ':00',
             end_time: endTime + ':00'
           }
@@ -71,8 +86,17 @@ export default function EditScheduleModal({
       );
 
       onSuccess();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to update schedule', err);
+      const errorObj = err as { response?: { data?: { message?: string; error?: string } }; message?: string };
+
+      // Get the exact error message from API response
+      const apiErrorMessage = errorObj?.response?.data?.message ||
+                             errorObj?.response?.data?.error ||
+                             errorObj?.message ||
+                             "Failed to update schedule. Please try again.";
+
+      setApiError(apiErrorMessage);
     } finally {
       setLoading(false);
     }
@@ -115,7 +139,10 @@ export default function EditScheduleModal({
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  setTimeError(''); // Clear error when user changes time
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors duration-200"
               />
             </div>
@@ -124,10 +151,25 @@ export default function EditScheduleModal({
               <input
                 type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={(e) => {
+                  setEndTime(e.target.value);
+                  setTimeError(''); // Clear error when user changes time
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors duration-200"
               />
             </div>
+            {timeError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{timeError}</p>
+              </div>
+            )}
+            {apiError && (
+              <ErrorMessage
+                message={apiError}
+                onClose={() => setApiError('')}
+                className="mb-4"
+              />
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -141,7 +183,7 @@ export default function EditScheduleModal({
             </button>
             <button
               onClick={handleSave}
-              disabled={!startTime || !endTime || loading}
+              disabled={!startTime || !endTime || loading || !!timeError}
               className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-teal-600 border border-transparent rounded-lg hover:from-green-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
             >
               {loading ? 'Saving...' : 'Save Changes'}

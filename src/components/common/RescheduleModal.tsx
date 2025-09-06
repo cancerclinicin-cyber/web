@@ -63,10 +63,27 @@ export default function RescheduleModal({
     if (!appointment) return;
 
     try {
+      // First, make API call to get schedule data and slot duration
       const response = await httpService.get<ScheduleResponse>(
-        `http://localhost:3000/api/v1/patients/patient_registrations/${appointment.patient_id}/check_available_schedule?date=${dateStr}&is_already_registered=${appointment.is_already_registered}`
+        `patients/patient_registrations/${appointment.patient_id}/check_available_schedule?date=${dateStr}&is_already_registered=false`
       );
-      setAvailableSlots(response.data.available_slots);
+
+      // Determine correct is_already_registered based on slot duration
+      // If slot_duration_minutes is 20 then is_already_registered should be true
+      // If slot_duration_minutes is 10 then is_already_registered should be false
+      const slotDuration = response.data.slot_duration_minutes;
+      const correctIsRegistered = slotDuration === 20;
+
+      // If the appointment's current status matches what we need, use the current response
+      if (appointment.is_already_registered === correctIsRegistered) {
+        setAvailableSlots(response.data.available_slots);
+      } else {
+        // Make second call with correct is_already_registered value
+        const correctResponse = await httpService.get<ScheduleResponse>(
+          `patients/patient_registrations/${appointment.patient_id}/check_available_schedule?date=${dateStr}&is_already_registered=${correctIsRegistered}`
+        );
+        setAvailableSlots(correctResponse.data.available_slots);
+      }
     } catch (err) {
       console.error('Failed to fetch slots', err);
     }
@@ -89,7 +106,7 @@ export default function RescheduleModal({
     try {
       const dateStr = selectedDate;
       await httpService.put(
-        'http://localhost:3000/api/v1/admin/booked_slots/update_slot_by_appointment',
+        'admin/booked_slots/update_slot_by_appointment',
         {
           appointment_id: appointment.id,
           slot_date: dateStr,

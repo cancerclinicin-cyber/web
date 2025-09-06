@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import { X } from 'lucide-react';
+import ErrorMessage from '../common/ErrorMessage';
 
 interface CustomSchedule {
   id: number;
@@ -36,6 +37,9 @@ export default function EditCustomScheduleModal({
   const [endTime, setEndTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [timeError, setTimeError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showError, setShowError] = useState(false);
+  const [, setShowSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen && schedule) {
@@ -115,8 +119,20 @@ export default function EditCustomScheduleModal({
       );
 
       onSuccess();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to update schedule', err);
+      const errorObj = err as { response?: { data?: { message?: string; error?: string } }; message?: string };
+
+      // Get the exact error message from API response
+      const apiErrorMessage = errorObj?.response?.data?.message ||
+                             errorObj?.response?.data?.error ||
+                             errorObj?.message ||
+                             "Failed to update schedule. Please try again.";
+
+      setErrorMessage(apiErrorMessage);
+      setShowError(true);
+      // Clear any existing success messages
+      setShowSuccess(false);
     } finally {
       setLoading(false);
     }
@@ -184,6 +200,13 @@ export default function EditCustomScheduleModal({
                 <p className="mt-1 text-sm text-red-600">{timeError}</p>
               )}
             </div>
+            {showError && (
+              <ErrorMessage
+                message={errorMessage}
+                onClose={() => setShowError(false)}
+                className="mb-4"
+              />
+            )}
           </div>
 
           {/* Action Buttons */}

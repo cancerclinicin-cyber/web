@@ -139,11 +139,15 @@ export default function Header() {
         <div className="container flex h-16 items-center justify-between px-4">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center shadow-md">
-              <div className="h-6 w-6 rounded-full bg-green-600"></div>
+            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center shadow-md p-1">
+              <img
+                src="/mediconnect-logo.svg"
+                alt="MediConnect Logo"
+                className="h-8 w-8"
+              />
             </div>
             <span className="text-xl font-bold text-white tracking-tight">
-              MediCare
+              MediConnect
             </span>
           </div>
 

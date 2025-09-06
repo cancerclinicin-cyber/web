@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Edit, 
-  Save, 
-  Camera, 
+import {
+  User,
+  Mail,
+  Phone,
+  Edit,
+  Save,
+  Camera,
   AlertCircle,
   X
 } from "lucide-react";
 import SuccessMessage from "../common/Messages/Success";
+import httpService from "../../common/utils/httpService";
 
 // Define the profile data structure based on API response
 interface AdminUser {
@@ -86,32 +87,24 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
     setError(null);
 
     try {
-      const myHeaders = new Headers();
-      myHeaders.append("Authorization", `Bearer ${access_token}`);
-      myHeaders.append("Accept", "application/json");
+      const response = await httpService.get<ProfileData>(
+        "admin/admin_settings",
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        }
+      );
 
-      const requestOptions = {
-        method: "GET",
-        headers: myHeaders,
-        redirect: "follow" as RequestRedirect
-      };
-
-      const response = await fetch("http://localhost:3000/api/v1/admin/admin_settings", requestOptions);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result: ProfileData = await response.json();
-      console.log("Profile data received:", result); // Debug log
-      setProfileData(result);
+      console.log("Profile data received:", response.data); // Debug log
+      setProfileData(response.data);
       setEditedUserData({
-        first_name: result.admin_user.first_name,
-        last_name: result.admin_user.last_name
+        first_name: response.data.admin_user.first_name,
+        last_name: response.data.admin_user.last_name
       });
       setEditedServiceData({
-        initial_consultation_price: result.consultation_service.initial_consultation_price,
-        follow_up_consultation_price: result.consultation_service.follow_up_consultation_price
+        initial_consultation_price: response.data.consultation_service.initial_consultation_price,
+        follow_up_consultation_price: response.data.consultation_service.follow_up_consultation_price
       });
     } catch (err: any) {
       console.error("Profile fetch error:", err);
@@ -181,22 +174,16 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
         formdata.append("logo", fileInputRef.current.files[0]);
       }
       
-      const myHeaders = new Headers();
-      myHeaders.append("Authorization", `Bearer ${access_token}`);
-      myHeaders.append("Accept", "application/json");
-      
-      const requestOptions = {
-        method: "PATCH",
-        headers: myHeaders,
-        body: formdata,
-        redirect: "follow" as RequestRedirect
-      };
-      
-      const response = await fetch("http://localhost:3000/api/v1/admin/admin_settings", requestOptions);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update profile: ${response.status}`);
-      }
+      await httpService.patch(
+        "admin/admin_settings",
+        formdata,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       
       // Re-fetch the updated data
       await fetchProfileData();

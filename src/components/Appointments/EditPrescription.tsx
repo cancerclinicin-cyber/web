@@ -7,7 +7,8 @@ import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
 import SuccessMessage from '../common/Messages/Success';
-import { ArrowLeft, FileText, Save, Plus, X } from "lucide-react";
+import { FileText, Save, Plus, X } from "lucide-react";
+import { decryptId, encryptId } from '../../common/utils/encryption';
 
 interface Patient {
   id: number;
@@ -52,10 +53,17 @@ interface Appointment {
 interface PrescriptionItem {
   id?: number;
   medication: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
   instructions: string;
+  prescriptionId?: number; // For existing prescriptions
+}
+
+interface PrescriptionNoteResponse {
+  id: number;
+  appointment_id: number;
+  prescription: string;
+  details: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function EditPrescription() {
@@ -65,26 +73,46 @@ export default function EditPrescription() {
   const { id } = useParams();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionItem[]>([
-    { medication: '', dosage: '', frequency: '', duration: '', instructions: '' }
+    { medication: 'Treatment History', instructions: '' },
+    { medication: 'Surgery', instructions: '' },
+    { medication: 'Chemo', instructions: '' },
+    { medication: 'Radiation', instructions: '' },
+    { medication: 'Immunotherapy', instructions: '' },
+    { medication: 'Others', instructions: '' },
+    { medication: 'Diagnosis', instructions: '' },
+    { medication: 'Instructions', instructions: '' },
+    { medication: 'Final Diagnosis', instructions: '' },
+    { medication: 'Advice', instructions: '' }
   ]);
-  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [successDescription, setSuccessDescription] = useState('');
+  const [validationErrors, setValidationErrors] = useState<{[key: number]: { medication?: string; instructions?: string }}>({});
+  const [originalPrescriptionItems, setOriginalPrescriptionItems] = useState<PrescriptionItem[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     // Check if appointment data was passed via navigation state
     if (location.state?.appointment) {
       setAppointment(location.state.appointment);
       setLoading(false);
+      // Fetch existing prescription notes
+      fetchPrescriptionNotes(location.state.appointment.id);
     } else if (id) {
       // Fetch appointment details if not passed via state
       fetchAppointmentDetails();
     }
   }, [id, location.state]);
+
+  // Run validation whenever prescription items change
+  useEffect(() => {
+    if (prescriptionItems.length > 0 && !loading && appointment) {
+      validatePrescriptionItems();
+    }
+  }, [prescriptionItems, appointment, loading]);
 
   const fetchAppointmentDetails = async () => {
     if (!id) return;
@@ -93,8 +121,11 @@ export default function EditPrescription() {
     setError(null);
 
     try {
+      // Decrypt the ID if it's encrypted
+      const actualId = decryptId(id);
+
       const response = await httpService.get<{ data: Appointment }>(
-        `http://localhost:3000/api/v1/admin/consultations/${id}`,
+        `admin/consultations/${actualId}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -103,6 +134,8 @@ export default function EditPrescription() {
       );
 
       setAppointment(response.data.data);
+      // Fetch existing prescription notes
+      fetchPrescriptionNotes(response.data.data.id);
     } catch (err) {
       console.error("Error fetching appointment details:", err);
       setError("Failed to fetch appointment details. Please try again later.");
@@ -111,43 +144,235 @@ export default function EditPrescription() {
     }
   };
 
+  const fetchPrescriptionNotes = async (appointmentId: number) => {
+    try {
+      const response = await httpService.get<{ message: string; data: PrescriptionNoteResponse[] }>(
+        `admin/prescription_notes?appointment_id=${appointmentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      console.log('Fetched prescription notes:', response.data);
+
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        // Map existing prescription data to our format
+        const existingPrescriptions = response.data.data.map((item: PrescriptionNoteResponse) => ({
+          id: item.id,
+          medication: item.prescription,
+          instructions: item.details,
+          prescriptionId: item.id
+        }));
+
+        setPrescriptionItems(existingPrescriptions);
+        setOriginalPrescriptionItems(JSON.parse(JSON.stringify(existingPrescriptions))); // Deep copy
+      } else {
+        // No existing prescriptions, keep default items
+        const defaultItems = [
+          { medication: 'Treatment History', instructions: '' },
+          { medication: 'Surgery', instructions: '' },
+          { medication: 'Chemo', instructions: '' },
+          { medication: 'Radiation', instructions: '' },
+          { medication: 'Immunotherapy', instructions: '' },
+          { medication: 'Others', instructions: '' },
+          { medication: 'Diagnosis', instructions: '' },
+          { medication: 'Instructions', instructions: '' },
+          { medication: 'Final Diagnosis', instructions: '' },
+          { medication: 'Advice', instructions: '' }
+        ];
+        setPrescriptionItems(defaultItems);
+        setOriginalPrescriptionItems(JSON.parse(JSON.stringify(defaultItems))); // Deep copy
+      }
+    } catch (err) {
+      console.error("Error fetching prescription notes:", err);
+      // If API fails, keep default items
+      setPrescriptionItems([
+        { medication: 'Treatment History', instructions: '' },
+        { medication: 'Surgery', instructions: '' },
+        { medication: 'Chemo', instructions: '' },
+        { medication: 'Radiation', instructions: '' },
+        { medication: 'Immunotherapy', instructions: '' },
+        { medication: 'Others', instructions: '' },
+        { medication: 'Diagnosis', instructions: '' },
+        { medication: 'Instructions', instructions: '' },
+        { medication: 'Final Diagnosis', instructions: '' },
+        { medication: 'Advice', instructions: '' }
+      ]);
+    }
+  };
+
   const addPrescriptionItem = () => {
-    setPrescriptionItems([...prescriptionItems, {
+    const updatedItems = [...prescriptionItems, {
       medication: '',
-      dosage: '',
-      frequency: '',
-      duration: '',
       instructions: ''
-    }]);
+    }];
+    setPrescriptionItems(updatedItems);
+    setHasChanges(checkForChanges(updatedItems));
   };
 
   const removePrescriptionItem = (index: number) => {
     if (prescriptionItems.length > 1) {
-      setPrescriptionItems(prescriptionItems.filter((_, i) => i !== index));
+      const updatedItems = prescriptionItems.filter((_, i) => i !== index);
+      setPrescriptionItems(updatedItems);
+      setHasChanges(checkForChanges(updatedItems));
     }
+  };
+
+  const checkForChanges = (currentItems: PrescriptionItem[]) => {
+    if (originalPrescriptionItems.length === 0) return false;
+
+    if (currentItems.length !== originalPrescriptionItems.length) {
+      return true; // Different number of items
+    }
+
+    for (let i = 0; i < currentItems.length; i++) {
+      const current = currentItems[i];
+      const original = originalPrescriptionItems[i];
+
+      if (!original) return true; // New item added
+
+      // Compare medication and instructions
+      if (current.medication !== original.medication || current.instructions !== original.instructions) {
+        return true; // Content changed
+      }
+    }
+
+    return false; // No changes
   };
 
   const updatePrescriptionItem = (index: number, field: keyof PrescriptionItem, value: string) => {
     const updatedItems = [...prescriptionItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setPrescriptionItems(updatedItems);
+
+    // Check for changes
+    const hasChanged = checkForChanges(updatedItems);
+    setHasChanges(hasChanged);
+
+    // Clear validation error for this field
+    if (validationErrors[index] && (field === 'medication' || field === 'instructions')) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        if (newErrors[index]) {
+          delete newErrors[index][field as keyof typeof newErrors[typeof index]];
+          if (Object.keys(newErrors[index]).length === 0) {
+            delete newErrors[index];
+          }
+        }
+        return newErrors;
+      });
+    }
+
+    // Clear general error when user starts typing
+    if (error) {
+      setError(null);
+    }
+  };
+
+
+  const validatePrescriptionItems = () => {
+    console.log('Validating prescription items:', prescriptionItems);
+    const errors: {[key: number]: { medication?: string; instructions?: string }} = {};
+    let hasErrors = false;
+
+    prescriptionItems.forEach((item, index) => {
+      console.log(`Validating item ${index}:`, item);
+      const itemErrors: { medication?: string; instructions?: string } = {};
+
+      // For custom medications (index >= 10), medication name is required
+      if (index >= 10 && !item.medication.trim()) {
+        itemErrors.medication = 'Medication name is required';
+        hasErrors = true;
+      }
+
+      // Instructions are always required for all items (including default ones)
+      const trimmedInstructions = item.instructions ? item.instructions.trim() : '';
+      console.log(`Item ${index} instructions: "${item.instructions}" (trimmed: "${trimmedInstructions}")`);
+
+      if (!trimmedInstructions || trimmedInstructions.length === 0) {
+        console.log(`Item ${index} has empty instructions - validation failed`);
+        itemErrors.instructions = 'Description is required';
+        hasErrors = true;
+      } else {
+        console.log(`Item ${index} has valid instructions`);
+      }
+
+      if (Object.keys(itemErrors).length > 0) {
+        errors[index] = itemErrors;
+      }
+    });
+
+    console.log('Validation errors:', errors);
+    console.log('Has errors:', hasErrors);
+    setValidationErrors(errors);
+    return !hasErrors;
   };
 
   const handleSave = async () => {
+    console.log('Handle save called');
+    console.log('Current prescription items:', prescriptionItems);
+
+    // Validate required fields
+    const isValid = validatePrescriptionItems();
+    console.log('Validation result:', isValid);
+    console.log('Validation errors after validation:', validationErrors);
+
+    if (!isValid) {
+      console.log('Validation failed, showing error');
+      setError('Please fill in all required fields');
+
+      // Scroll to top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
-      // Here you would typically save the prescription to your API
-      // For now, we'll just simulate a successful save
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Format prescription data according to API requirements
+      const prescriptionData = prescriptionItems.map(item => ({
+        prescription: item.medication,
+        details: item.instructions
+      }));
+
+      const requestBody = {
+        appointment_id: appointment?.id,
+        prescription: prescriptionData
+      };
+
+      console.log('Saving prescription:', requestBody);
+
+      // Always use POST - the API should handle creating/updating
+      const response = await httpService.post(
+        'admin/prescription_notes',
+        requestBody,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+
+      console.log('Prescription saved successfully:', response.data);
 
       setSuccessMessage('Prescription Saved');
       setSuccessDescription('The prescription has been successfully saved.');
       setShowSuccess(true);
 
+      // Update original items to reflect the saved state
+      setOriginalPrescriptionItems(JSON.parse(JSON.stringify(prescriptionItems)));
+      setHasChanges(false);
+
       setTimeout(() => {
-        navigate(`/appointments/${id}`);
+        if (appointment) {
+          const encryptedId = encryptId(appointment.id);
+          navigate(`/appointments/${encryptedId}`, { state: { appointment } });
+        }
       }, 2000);
     } catch (err) {
       console.error("Error saving prescription:", err);
@@ -201,24 +426,94 @@ export default function EditPrescription() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <Header />
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Header />
 
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate(`/appointments/${id}`)}
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4 transition-colors duration-200"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Appointment Details
+      {/* Mobile Menu */}
+      <div className="md:hidden bg-green-700 border-t border-green-600">
+        <div className="flex overflow-x-auto py-2 px-2 space-x-1">
+          <button className="flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap text-green-100 hover:bg-green-600 transition-colors">
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <span>Dashboard</span>
           </button>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Edit Prescription</h1>
-          <p className="text-gray-600">Patient: {appointment.patient.first_name} {appointment.patient.last_name}</p>
+          <button className="flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap text-green-100 hover:bg-green-600 transition-colors">
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>Appointments</span>
+          </button>
+          <button className="flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap bg-green-800 text-white">
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Edit Prescription</span>
+          </button>
         </div>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
+      {/* Breadcrumb */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex py-4" aria-label="Breadcrumb">
+            <ol className="flex items-center space-x-4">
+              <li>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="text-gray-400 hover:text-gray-500 transition-colors"
+                >
+                  Dashboard
+                </button>
+              </li>
+              <li>
+                <svg className="flex-shrink-0 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/appointments')}
+                  className="text-gray-400 hover:text-gray-500 transition-colors"
+                >
+                  Appointments
+                </button>
+              </li>
+              <li>
+                <svg className="flex-shrink-0 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    if (appointment) {
+                      const encryptedId = encryptId(appointment.id);
+                      navigate(`/appointments/${encryptedId}`, { state: { appointment } });
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-500 transition-colors"
+                >
+                  Appointment Details
+                </button>
+              </li>
+              <li>
+                <svg className="flex-shrink-0 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </li>
+              <li>
+                <div className="flex items-center">
+                  <span className="text-gray-500">Edit Prescription</span>
+                </div>
+              </li>
+            </ol>
+          </nav>
+        </div>
+      </div>
+
+      <div className="w-full p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-purple-600" />
@@ -238,85 +533,64 @@ export default function EditPrescription() {
             {prescriptionItems.map((item, index) => (
               <div key={index} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Medication #{index + 1}</h3>
-                  {prescriptionItems.length > 1 && (
-                    <button
-                      onClick={() => removePrescriptionItem(index)}
-                      className="text-red-600 hover:text-red-800 p-1"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
+                   <h3 className="text-lg font-semibold text-gray-900">
+                     {index < 10 ? item.medication : 'Add Prescription'}
+                   </h3>
+                   {index >= 10 && (
+                     <button
+                       onClick={() => removePrescriptionItem(index)}
+                       className="text-red-600 hover:text-red-800 p-1"
+                     >
+                       <X className="w-5 h-5" />
+                     </button>
+                   )}
+                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name</label>
-                    <input
-                      type="text"
-                      value={item.medication}
-                      onChange={(e) => updatePrescriptionItem(index, 'medication', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Enter medication name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Dosage</label>
-                    <input
-                      type="text"
-                      value={item.dosage}
-                      onChange={(e) => updatePrescriptionItem(index, 'dosage', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="e.g., 500mg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
-                    <input
-                      type="text"
-                      value={item.frequency}
-                      onChange={(e) => updatePrescriptionItem(index, 'frequency', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="e.g., Twice daily"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
-                    <input
-                      type="text"
-                      value={item.duration}
-                      onChange={(e) => updatePrescriptionItem(index, 'duration', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="e.g., 7 days"
-                    />
-                  </div>
-                </div>
+                <div className="space-y-4">
+                   {index >= 10 && (
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
+                       <input
+                         type="text"
+                         value={item.medication}
+                         onChange={(e) => updatePrescriptionItem(index, 'medication', e.target.value)}
+                         className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                           validationErrors[index]?.medication ? 'border-red-500' : 'border-gray-300'
+                         }`}
+                         placeholder="Enter medication name"
+                         required
+                       />
+                       {validationErrors[index]?.medication && (
+                         <p className="text-red-500 text-sm mt-1">{validationErrors[index].medication}</p>
+                       )}
+                     </div>
+                   )}
+                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Instructions</label>
-                  <textarea
-                    value={item.instructions}
-                    onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Special instructions for the patient"
-                  />
-                </div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                     Description <span className="text-red-500">*</span>
+                     {index < 10 && <span className="text-xs text-gray-500 ml-1">(Required)</span>}
+                   </label>
+                   <textarea
+                     value={item.instructions}
+                     onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
+                     rows={3}
+                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                       validationErrors[index]?.instructions ? 'border-red-500' : 'border-gray-300'
+                     }`}
+                     placeholder="Special instructions for the patient"
+                     required
+                   />
+                   {validationErrors[index]?.instructions && (
+                     <p className="text-red-500 text-sm mt-1">{validationErrors[index].instructions}</p>
+                   )}
+                 </div>
               </div>
             ))}
           </div>
 
-          {/* Additional Notes */}
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Any additional notes or instructions"
-            />
-          </div>
+
 
           {/* Error Message */}
           {error && (
@@ -328,7 +602,8 @@ export default function EditPrescription() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p className="text-sm text-red-700 font-medium">{error}</p>
+                  <p className="text-sm text-red-600 mt-1">Please fill in all required description fields before saving.</p>
                 </div>
               </div>
             </div>
@@ -337,15 +612,29 @@ export default function EditPrescription() {
           {/* Action Buttons */}
           <div className="mt-8 flex justify-end space-x-4">
             <button
-              onClick={() => navigate(`/appointments/${id}`)}
+              onClick={() => {
+                console.log('Cancel button clicked, appointment:', appointment);
+                if (appointment) {
+                  const encryptedId = encryptId(appointment.id);
+                  console.log('Navigating to:', `/appointments/${encryptedId}`);
+                  navigate(`/appointments/${encryptedId}`, { state: { appointment } });
+                } else {
+                  console.log('No appointment data, navigating to /appointments');
+                  navigate('/appointments');
+                }
+              }}
               className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-purple-600 border border-transparent rounded-lg hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+              disabled={saving || Object.keys(validationErrors).length > 0 || !hasChanges}
+              className={`inline-flex items-center px-6 py-3 text-sm font-medium text-white border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg ${
+                Object.keys(validationErrors).length > 0 || !hasChanges
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+              }`}
             >
               {saving ? (
                 <>
@@ -358,13 +647,13 @@ export default function EditPrescription() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Save Prescription
+                  {hasChanges ? 'Save Prescription' : 'No Changes'}
                 </>
               )}
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
       <SuccessMessage
         message={successMessage}

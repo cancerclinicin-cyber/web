@@ -5,6 +5,7 @@ import config from "../configLoader";
 import { Provider } from "react-redux";
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from "../store";
+import { LoadingProvider } from "./components/common/LoadingContext";
 
 const AppRoutes: React.FC = () => {
   return useRoutes(routes);
@@ -18,9 +19,11 @@ const App: React.FC = () => {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <Router>
-          <AppRoutes />
-        </Router>
+        <LoadingProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </LoadingProvider>
       </PersistGate>
     </Provider>
   );

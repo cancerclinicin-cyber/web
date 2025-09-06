@@ -2,21 +2,21 @@
 
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, Sparkles } from "lucide-react";
+import { X as CloseIcon, AlertTriangle } from "lucide-react";
 
-interface SuccessMessageProps {
+interface ErrorMessageProps {
   message: string;
   description: string;
   isVisible: boolean;
   onClose: () => void;
 }
 
-export default function SuccessMessage({
+export default function ErrorMessage({
   message,
   description,
   isVisible,
   onClose
-}: SuccessMessageProps) {
+}: ErrorMessageProps) {
   // Auto-hide after 6 seconds
   useEffect(() => {
     if (isVisible) {
@@ -30,13 +30,13 @@ export default function SuccessMessage({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-emerald-900/40 via-teal-900/30 to-cyan-900/40 flex items-center justify-center z-50 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 bg-gradient-to-br from-red-900/40 via-rose-900/30 to-pink-900/40 flex items-center justify-center z-50 p-4 backdrop-blur-md">
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 bg-emerald-400/30 rounded-full"
+            className="absolute w-1 h-1 bg-red-400/30 rounded-full"
             initial={{
               x: Math.random() * window.innerWidth,
               y: Math.random() * window.innerHeight,
@@ -68,9 +68,9 @@ export default function SuccessMessage({
             damping: 25,
             duration: 0.6
           }}
-          className="relative bg-gradient-to-br from-white via-emerald-50/50 to-teal-50/30 rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-emerald-200/50 backdrop-blur-xl"
+          className="relative bg-gradient-to-br from-white via-red-50/50 to-rose-50/30 rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-red-200/50 backdrop-blur-xl"
         >
-          {/* Success icon with enhanced animation */}
+          {/* Error icon with enhanced animation */}
           <div className="flex justify-center mb-6">
             <motion.div
               className="relative"
@@ -85,30 +85,30 @@ export default function SuccessMessage({
             >
               {/* Outer ring */}
               <motion.div
-                className="w-20 h-20 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center"
+                className="w-20 h-20 rounded-full bg-gradient-to-r from-red-400 to-rose-500 flex items-center justify-center"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 300 }}
               >
                 {/* Inner circle */}
                 <motion.div
-                  className="w-16 h-16 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg"
+                  className="w-16 h-16 rounded-full bg-gradient-to-r from-red-500 to-rose-600 flex items-center justify-center shadow-lg"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.4, type: "spring", stiffness: 300 }}
                 >
-                  {/* Check icon */}
+                  {/* Alert icon */}
                   <motion.div
                     initial={{ scale: 0, rotate: -90 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.5, type: "spring", stiffness: 400 }}
                   >
-                    <Check className="h-8 w-8 text-white drop-shadow-sm" strokeWidth={3} />
+                    <AlertTriangle className="h-8 w-8 text-white drop-shadow-sm" strokeWidth={3} />
                   </motion.div>
                 </motion.div>
               </motion.div>
 
-              {/* Sparkle effects */}
+              {/* Warning effects */}
               {[...Array(6)].map((_, i) => (
                 <motion.div
                   key={i}
@@ -130,7 +130,7 @@ export default function SuccessMessage({
                     left: `${20 + Math.cos(i * 60 * Math.PI / 180) * 35}px`,
                   }}
                 >
-                  <Sparkles className="h-3 w-3 text-emerald-400" />
+                  <AlertTriangle className="h-3 w-3 text-red-400" />
                 </motion.div>
               ))}
             </motion.div>
@@ -139,7 +139,7 @@ export default function SuccessMessage({
           {/* Content */}
           <div className="text-center">
             <motion.h3
-              className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-3"
+              className="text-2xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent mb-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.5 }}
@@ -167,13 +167,13 @@ export default function SuccessMessage({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.8, type: "spring", stiffness: 300 }}
           >
-            <X className="h-5 w-5" />
+            <CloseIcon className="h-5 w-5" />
           </motion.button>
 
           {/* Enhanced progress bar */}
           <div className="mt-8 w-full h-2 bg-gray-100/50 rounded-full overflow-hidden backdrop-blur-sm">
             <motion.div
-              className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full shadow-sm"
+              className="h-full bg-gradient-to-r from-red-400 to-rose-500 rounded-full shadow-sm"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 6, ease: "easeInOut" }}
@@ -182,7 +182,7 @@ export default function SuccessMessage({
 
           {/* Subtle glow effect */}
           <motion.div
-            className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-400/10 to-teal-400/10 pointer-events-none"
+            className="absolute inset-0 rounded-3xl bg-gradient-to-r from-red-400/10 to-rose-400/10 pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}

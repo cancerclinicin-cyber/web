@@ -17,6 +17,7 @@ import {
 import { logout } from "../../Login/authSlice";
 import ProfileModal from "../../Profile/Profile";
 import ChangePasswordModal from "../../ChangePassword/ChangePassword";
+import httpService from "../../../common/utils/httpService";
 
 // Define the Redux state structure
 interface RootState {
@@ -92,44 +93,43 @@ export default function Header() {
   const handleChangePassword = async (
     currentPassword: string,
     newPassword: string
-  ) => {
+  ): Promise<{
+    success: boolean | string;
+    message?: string;
+    status?: number | string;
+  }> => {
     if (!access_token) {
       throw new Error("Authentication token not found");
     }
 
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Authorization", `Bearer ${access_token}`);
-
-    const raw = JSON.stringify({
-      current_password: currentPassword,
-      new_password: newPassword,
-    });
-
-    const requestOptions = {
-      method: "PATCH",
-      headers: myHeaders,
-      body: raw,
-      redirect: "follow" as RequestRedirect,
-    };
-
     try {
-      const response = await fetch(
-        "http://localhost:3000/api/v1/auth/change_password",
-        requestOptions
+      const response = await httpService.patch(
+        "auth/change_password",
+        {
+          current_password: currentPassword,
+          new_password: newPassword,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to change password");
-      }
-
-      const result = await response.json();
-      console.log("Password changed successfully:", result);
-      return result;
-    } catch (error: any) {
+      console.log("Password changed successfully:", response.data);
+      return {
+        success: true,
+        message: "Password changed successfully",
+        status: 200
+      };
+    } catch (error) {
       console.error("Password change error:", error);
-      throw error;
+      const err = error as { message?: string; status?: number };
+      return {
+        success: false,
+        message: err.message || "Failed to change password",
+        status: err.status || 500
+      };
     }
   };
 
@@ -191,13 +191,13 @@ export default function Header() {
               {isSchedulesOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-xl border border-green-200 bg-white shadow-xl py-2 z-50">
                   <a
-                    href="#"
+                    href="/schedules"
                     className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg mx-2"
                   >
                     <span className="ml-1">Normal</span>
                   </a>
                   <a
-                    href="#"
+                    href="/custom-schedules"
                     className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg mx-2"
                   >
                     <span className="ml-1">Custom</span>
@@ -289,14 +289,14 @@ export default function Header() {
                 </div>
                 <div className="pl-8 flex flex-col space-y-1">
                   <a
-                    href="#"
+                    href="/schedules"
                     className="flex items-center gap-3 px-4 py-3 text-white hover:bg-green-800/50 rounded-lg transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <span>Normal</span>
                   </a>
                   <a
-                    href="#"
+                    href="/custom-schedules"
                     className="flex items-center gap-3 px-4 py-3 text-white hover:bg-green-800/50 rounded-lg transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >

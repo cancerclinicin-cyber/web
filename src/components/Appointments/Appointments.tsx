@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../../store';
@@ -8,6 +8,9 @@ import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
 import SuccessMessage from '../common/Messages/Success';
 import { Search, Calendar, Video, FileText, ChevronUp, ChevronDown, User } from "lucide-react";
+import { encryptId } from '../../common/utils/encryption';
+import RescheduleModal from '../common/RescheduleModal';
+import { useLoading } from '../common/LoadingContext';
 
 interface Patient {
   id: number;
@@ -73,26 +76,15 @@ interface ApiResponse {
   current_count: number;
 }
 
-interface Slot {
-  start: string;
-  end: string;
-}
-
-interface ScheduleResponse {
-  id: number;
-  date: string;
-  day: string;
-  source: string;
-  slot_duration_minutes: number;
-  total_slots: number;
-  available_slots: Slot[];
-}
 
 export default function Appointments() {
   const accessToken = useSelector((state: RootState) => state.auth.access_token);
   const navigate = useNavigate();
+  const { setIsLoading, setLoadingMessage } = useLoading();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Appointment; direction: 'asc' | 'desc' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -102,9 +94,6 @@ export default function Appointments() {
   const [totalPages, setTotalPages] = useState(0);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [successDescription, setSuccessDescription] = useState('');
@@ -113,10 +102,15 @@ export default function Appointments() {
   const fetchAppointments = async () => {
     setLoading(true);
     setError(null);
+    setIsLoading(true);
+    setLoadingMessage("Loading appointments...");
 
     try {
+      const sortBy = sortConfig?.key || 'created_at';
+      const sortDir = sortConfig?.direction || 'desc';
+
       const response = await httpService.get<ApiResponse>(
-        `http://localhost:3000/api/v1/admin/consultations?page=${currentPage}&per_page=${itemsPerPage}&sort_by=created_at&sort_dir=desc&search=${searchTerm}`,
+        `admin/consultations?page=${currentPage}&per_page=${itemsPerPage}&sort_by=${sortBy}&sort_dir=${sortDir}&search=${debouncedSearchTerm}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -132,13 +126,32 @@ export default function Appointments() {
       setError("Failed to fetch appointments. Please try again later.");
     } finally {
       setLoading(false);
+      setIsLoading(false);
+      // Maintain focus on search input after API response
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 100);
     }
   };
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Fetch appointments when dependencies change
   useEffect(() => {
-    fetchAppointments();
-  }, [currentPage, itemsPerPage, searchTerm]);
+    // Only search if debounced search term has 3+ characters or is empty
+    if (debouncedSearchTerm.length === 0 || debouncedSearchTerm.length >= 3) {
+      fetchAppointments();
+    }
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, sortConfig]);
 
   // Sort appointments based on sort configuration
   const sortedAppointments = useMemo(() => {
@@ -171,10 +184,10 @@ export default function Appointments() {
     setSortConfig({ key, direction });
   };
 
-  // Reset to first page when search term changes
+  // Reset to first page when debounced search term changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [debouncedSearchTerm]);
 
   // Format date for display
   const formatDate = (dateString: string | null) => {
@@ -185,6 +198,24 @@ export default function Appointments() {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth: string | null) => {
+    if (!dateOfBirth) return "N/A";
+
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    // If birthday hasn't occurred this year yet, subtract 1
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    return age.toString();
   };
 
   // Handle reschedule
@@ -200,63 +231,16 @@ export default function Appointments() {
 
   // Handle appointment details navigation
   const handleAppointmentDetails = (appointment: Appointment) => {
-    navigate(`/appointments/${appointment.id}`, { state: { appointment } });
+    const encryptedId = encryptId(appointment.id);
+    navigate(`/appointments/${encryptedId}`, { state: { appointment } });
   };
 
   // Handle edit prescription
   const handleEditPrescription = (appointment: Appointment) => {
-    navigate(`/appointments/${appointment.id}/edit-prescription`, { state: { appointment } });
+    const encryptedId = encryptId(appointment.id);
+    navigate(`/appointments/${encryptedId}/edit-prescription`, { state: { appointment } });
   };
 
-  // Fetch available slots
-  const fetchAvailableSlots = async (date: Date) => {
-    if (!selectedAppointment) return;
-    const dateStr = date.toISOString().split('T')[0];
-    try {
-      const response = await httpService.get<ScheduleResponse>(
-        `http://localhost:3000/api/v1/patients/patient_registrations/${selectedAppointment.patient_id}/check_available_schedule?date=${dateStr}&is_already_registered=${selectedAppointment.is_already_registered}`
-      );
-      setAvailableSlots(response.data.available_slots);
-    } catch (err) {
-      console.error('Failed to fetch slots', err);
-    }
-  };
-
-  // Handle date change
-  const handleDateChange = (date: Date | null) => {
-    setSelectedDate(date);
-    if (date) {
-      fetchAvailableSlots(date);
-    }
-  };
-
-  // Handle save reschedule
-  const handleSaveReschedule = async () => {
-    if (!selectedAppointment || !selectedDate || !selectedSlot) return;
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    try {
-      await httpService.put(
-        'http://localhost:3000/api/v1/admin/booked_slots/update_slot_by_appointment',
-        {
-          appointment_id: selectedAppointment.id,
-          slot_date: dateStr,
-          slot_time: selectedSlot,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      setShowRescheduleModal(false);
-      setSuccessMessage('Appointment Rescheduled');
-      setSuccessDescription('The appointment has been successfully rescheduled.');
-      setShowSuccess(true);
-      fetchAppointments();
-    } catch (err) {
-      console.error('Failed to reschedule', err);
-    }
-  };
 
   // Render loading state
   if (loading) {
@@ -307,8 +291,26 @@ export default function Appointments() {
   return (
     <>
       <div id="root-portal" />
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Header />
+
+        {/* Mobile Menu */}
+        <div className="md:hidden bg-green-700 border-t border-green-600">
+          <div className="flex overflow-x-auto py-2 px-2 space-x-1">
+            <button className="flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap text-green-100 hover:bg-green-600 transition-colors">
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <span>Dashboard</span>
+            </button>
+            <button className="flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap bg-green-800 text-white">
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>Appointments</span>
+            </button>
+          </div>
+        </div>
 
         {/* Search and Filters */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 mx-6">
@@ -318,6 +320,7 @@ export default function Appointments() {
                 <Search className="h-5 w-5 text-gray-400" />
               </div>
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search appointments by name or ID..."
                 value={searchTerm}
@@ -384,7 +387,10 @@ export default function Appointments() {
                     <tr
                       key={appointment.id}
                       className="hover:bg-teal-50 transition-colors cursor-pointer"
-                      onClick={() => handleAppointmentDetails(appointment)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAppointmentDetails(appointment);
+                      }}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center">
@@ -420,7 +426,7 @@ export default function Appointments() {
                           </div>
                           <div>
                             <span className="font-medium">Age:</span>
-                            <span className="ml-2">{appointment.patient.age || "N/A"}</span>
+                            <span className="ml-2">{calculateAge(appointment.patient.date_of_birth)}</span>
                           </div>
                           <div>
                             <span className="font-medium">DOB:</span>
@@ -572,92 +578,17 @@ export default function Appointments() {
         </div>
       </div>
 
-      {/* Reschedule Modal */}
-      {showRescheduleModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden transform transition-all relative z-[70]">
-            <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-white/20 rounded-full">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-white">Reschedule Appointment</h2>
-                </div>
-                <button
-                  onClick={() => setShowRescheduleModal(false)}
-                  className="text-white/80 hover:text-white transition-colors p-1"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-green-100 mt-2">Select a new date and time for this appointment</p>
-            </div>
-
-            <div className="p-8">
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Select Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      const date = e.target.value ? new Date(e.target.value) : null;
-                      handleDateChange(date);
-                    }}
-                    className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                  <div className="absolute right-3 top-3 text-gray-400">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                </div>
-              </div>
-
-              {availableSlots.length > 0 && (
-                <div className="mb-8">
-                  <label className="block text-sm font-semibold text-gray-700 mb-4">Select Time Slot</label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
-                    {availableSlots.map((slot, index) => (
-                      <label key={index} className="flex items-center p-3 bg-gray-50 hover:bg-teal-50 rounded-lg cursor-pointer transition-all duration-200 border border-gray-200 hover:border-teal-300">
-                        <input
-                          type="radio"
-                          name="slot"
-                          value={`${slot.start}-${slot.end}`}
-                          checked={selectedSlot === `${slot.start}-${slot.end}`}
-                          onChange={(e) => setSelectedSlot(e.target.value)}
-                          className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 focus:ring-teal-500 focus:ring-2"
-                        />
-                        <span className="ml-3 text-sm font-medium text-gray-900">
-                          {slot.start} - {slot.end}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => setShowRescheduleModal(false)}
-                  className="px-8 py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveReschedule}
-                  disabled={!selectedDate || !selectedSlot}
-                  className="px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-green-600 border border-transparent rounded-lg hover:from-teal-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <RescheduleModal
+        isOpen={showRescheduleModal}
+        onClose={() => setShowRescheduleModal(false)}
+        appointment={selectedAppointment}
+        onSuccess={() => {
+          setSuccessMessage('Appointment Rescheduled');
+          setSuccessDescription('The appointment has been successfully rescheduled.');
+          setShowSuccess(true);
+          fetchAppointments();
+        }}
+      />
 
       <SuccessMessage
         message={successMessage}

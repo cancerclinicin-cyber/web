@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../../../store';
+import { startMeeting } from './meetingSlice';
 import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
 import SuccessMessage from '../common/Messages/Success';
@@ -79,6 +80,7 @@ interface ApiResponse {
 
 export default function Appointments() {
   const accessToken = useSelector((state: RootState) => state.auth.access_token);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { setIsLoading, setLoadingMessage } = useLoading();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -226,7 +228,7 @@ export default function Appointments() {
 
   // Handle start meeting
   const handleStartMeeting = (appointment: Appointment) => {
-    window.open(appointment.meet_link, '_blank');
+    dispatch(startMeeting(appointment.meet_link));
   };
 
   // Handle appointment details navigation

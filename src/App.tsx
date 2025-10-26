@@ -2,13 +2,18 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, useRoutes, useLocation } from "react-router-dom";
 import { routes } from "./routes";
 import config from "../configLoader";
-import { Provider } from "react-redux";
+import { Provider, useSelector, useDispatch } from "react-redux";
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from "../store";
 import { LoadingProvider } from "./components/common/LoadingContext";
+import MeetingPlayer from "./components/Appointments/MeetingPlayer";
+import type { RootState } from "../store";
+import { closeMeeting, minimizeMeeting } from "./components/Appointments/meetingSlice";
 
 const AppRoutes: React.FC = () => {
   const location = useLocation();
+  const dispatch = useDispatch();
+  const meetingPlayer = useSelector((state: RootState) => state.meeting);
 
   useEffect(() => {
     // Page-specific titles
@@ -41,9 +46,24 @@ const AppRoutes: React.FC = () => {
 
     // Fallback to default title
     document.title = title || (config.APPLICATION_TITLE || 'MediConnect');
-  }, [location.pathname]);
 
-  return useRoutes(routes);
+    // Minimize meeting player when navigating to different pages
+    if (meetingPlayer.isOpen && !meetingPlayer.isMinimized) {
+      dispatch(minimizeMeeting());
+    }
+  }, [location.pathname, meetingPlayer.isOpen, meetingPlayer.isMinimized, dispatch]);
+
+  return (
+    <>
+      {useRoutes(routes)}
+      {meetingPlayer.isOpen && meetingPlayer.link && (
+        <MeetingPlayer
+          link={meetingPlayer.link}
+          onClose={() => dispatch(closeMeeting())}
+        />
+      )}
+    </>
+  );
 };
 
 const App: React.FC = () => {

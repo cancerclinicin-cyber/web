@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './src/components/Login/authSlice';
+import meetingReducer from './src/components/Appointments/meetingSlice';
 import storage from 'redux-persist/lib/storage';
 import { persistReducer, persistStore } from 'redux-persist';
 import { combineReducers } from 'redux';
@@ -19,6 +20,7 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   auth: authReducer,
+  meeting: meetingReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

@@ -5,7 +5,7 @@ import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
 import SuccessMessage from '../common/Messages/Success';
-import { FileText, Save, Plus, X, Edit } from "lucide-react";
+import { FileText, Save, Plus, X, Edit, ChevronDown, ChevronUp } from "lucide-react";
 import { decryptId, encryptId } from '../../common/utils/encryption';
 
 interface Patient {
@@ -96,6 +96,7 @@ export default function EditPrescription() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState<'treatment' | 'diagnosis'>('treatment');
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     // Check if appointment data was passed via navigation state
@@ -215,6 +216,16 @@ export default function EditPrescription() {
     }];
     setPrescriptionItems(updatedItems);
     setHasChanges(checkForChanges(updatedItems));
+  };
+
+  const toggleCardExpansion = (index: number) => {
+    const newExpanded = new Set(expandedCards);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedCards(newExpanded);
   };
 
   const removePrescriptionItem = (index: number) => {
@@ -585,71 +596,88 @@ export default function EditPrescription() {
                 Add {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-4">
               {prescriptionItems.map((item, globalIndex) => item.tab === activeTab && (
-                  <div key={globalIndex} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
+                  <div key={globalIndex} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                    <button
+                      onClick={() => toggleCardExpansion(globalIndex)}
+                      className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-100 transition-colors"
+                    >
                       <h3 className="text-lg font-semibold text-gray-900">
                         {item.medication || 'Add Prescription'}
                       </h3>
-                      {item.medication !== 'Treatment History' &&
-                       item.medication !== 'Surgery' &&
-                       item.medication !== 'Chemo' &&
-                       item.medication !== 'Radiation' &&
-                       item.medication !== 'Immunotherapy' &&
-                       item.medication !== 'Others' &&
-                       item.medication !== 'Diagnosis' &&
-                       item.medication !== 'Instructions' &&
-                       item.medication !== 'Final Diagnosis' &&
-                       item.medication !== 'Advice' && (
-                        <button
-                          onClick={() => removePrescriptionItem(globalIndex)}
-                          disabled={!isEditing}
-                          className={`p-1 ${isEditing ? 'text-red-600 hover:text-red-800' : 'text-gray-400 cursor-not-allowed'}`}
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
+                      <div className="flex items-center space-x-2">
+                        {item.medication !== 'Treatment History' &&
+                         item.medication !== 'Surgery' &&
+                         item.medication !== 'Chemo' &&
+                         item.medication !== 'Radiation' &&
+                         item.medication !== 'Immunotherapy' &&
+                         item.medication !== 'Others' &&
+                         item.medication !== 'Diagnosis' &&
+                         item.medication !== 'Instructions' &&
+                         item.medication !== 'Final Diagnosis' &&
+                         item.medication !== 'Advice' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removePrescriptionItem(globalIndex);
+                            }}
+                            disabled={!isEditing}
+                            className={`p-1 ${isEditing ? 'text-red-600 hover:text-red-800' : 'text-gray-400 cursor-not-allowed'}`}
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                        {expandedCards.has(globalIndex) ? (
+                          <ChevronUp className="w-5 h-5 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-gray-500" />
+                        )}
+                      </div>
+                    </button>
 
-                    <div className="space-y-4">
-                      {!['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication) && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
-                          <input
-                            type="text"
-                            value={item.medication}
-                            onChange={(e) => updatePrescriptionItem(globalIndex, 'medication', e.target.value)}
+                    {expandedCards.has(globalIndex) && (
+                      <div className="px-6 pb-6">
+                        <div className="space-y-4">
+                          {!['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication) && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
+                              <input
+                                type="text"
+                                value={item.medication}
+                                onChange={(e) => updatePrescriptionItem(globalIndex, 'medication', e.target.value)}
+                                disabled={!isEditing}
+                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                                  validationErrors[globalIndex]?.medication ? 'border-red-500' : 'border-gray-300'
+                                } ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                placeholder="Enter medication name"
+                                required
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 w-full">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Description <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={item.instructions}
+                            onChange={(e) => updatePrescriptionItem(globalIndex, 'instructions', e.target.value)}
+                            rows={3}
                             disabled={!isEditing}
                             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                              validationErrors[globalIndex]?.medication ? 'border-red-500' : 'border-gray-300'
+                              validationErrors[globalIndex]?.instructions ? 'border-red-500' : 'border-gray-300'
                             } ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                            placeholder="Enter medication name"
+                            placeholder="Special instructions for the patient"
                             required
                           />
+                          {validationErrors[globalIndex]?.instructions && (
+                            <p className="text-red-500 text-sm mt-1">{validationErrors[globalIndex].instructions}</p>
+                          )}
                         </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 w-full">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        value={item.instructions}
-                        onChange={(e) => updatePrescriptionItem(globalIndex, 'instructions', e.target.value)}
-                        rows={3}
-                        disabled={!isEditing}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                          validationErrors[globalIndex]?.instructions ? 'border-red-500' : 'border-gray-300'
-                        } ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                        placeholder="Special instructions for the patient"
-                        required
-                      />
-                      {validationErrors[globalIndex]?.instructions && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors[globalIndex].instructions}</p>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>

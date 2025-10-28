@@ -94,7 +94,7 @@ export default function EditPrescription() {
   const [validationErrors, setValidationErrors] = useState<{[key: number]: { medication?: string; instructions?: string }}>({});
   const [originalPrescriptionItems, setOriginalPrescriptionItems] = useState<PrescriptionItem[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState<'treatment' | 'diagnosis'>('treatment');
 
   useEffect(() => {
@@ -373,7 +373,6 @@ export default function EditPrescription() {
       // Update original items to reflect the saved state
       setOriginalPrescriptionItems(JSON.parse(JSON.stringify(prescriptionItems)));
       setHasChanges(false);
-      setIsEditing(false);
 
       setTimeout(() => {
         if (appointment) {
@@ -587,8 +586,7 @@ export default function EditPrescription() {
               </button>
             </div>
             <div className="grid grid-cols-1 gap-6">
-              {prescriptionItems.filter(item => item.tab === activeTab).map((item, globalIndex) => {
-                return (
+              {prescriptionItems.map((item, globalIndex) => item.tab === activeTab && (
                   <div key={globalIndex} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -632,7 +630,7 @@ export default function EditPrescription() {
                         </div>
                       )}
                     </div>
-  
+
                     <div className="mt-4 w-full">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Description <span className="text-red-500">*</span>
@@ -653,8 +651,7 @@ export default function EditPrescription() {
                       )}
                     </div>
                   </div>
-                );
-              })}
+                ))}
             </div>
   
   

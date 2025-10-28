@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSelector } from 'react-redux';
@@ -7,7 +5,7 @@ import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
 import SuccessMessage from '../common/Messages/Success';
-import { FileText, Save, Plus, X } from "lucide-react";
+import { FileText, Save, Plus, X, Edit } from "lucide-react";
 import { decryptId, encryptId } from '../../common/utils/encryption';
 
 interface Patient {
@@ -55,7 +53,10 @@ interface PrescriptionItem {
   medication: string;
   instructions: string;
   prescriptionId?: number; // For existing prescriptions
+  tab: 'treatment' | 'diagnosis';
 }
+
+const TREATMENT_MEDICATIONS = ['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others'];
 
 interface PrescriptionNoteResponse {
   id: number;
@@ -73,16 +74,16 @@ export default function EditPrescription() {
   const { id } = useParams();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionItem[]>([
-    { medication: 'Treatment History', instructions: '' },
-    { medication: 'Surgery', instructions: '' },
-    { medication: 'Chemo', instructions: '' },
-    { medication: 'Radiation', instructions: '' },
-    { medication: 'Immunotherapy', instructions: '' },
-    { medication: 'Others', instructions: '' },
-    { medication: 'Diagnosis', instructions: '' },
-    { medication: 'Instructions', instructions: '' },
-    { medication: 'Final Diagnosis', instructions: '' },
-    { medication: 'Advice', instructions: '' }
+    { medication: 'Treatment History', instructions: '', tab: 'treatment' },
+    { medication: 'Surgery', instructions: '', tab: 'treatment' },
+    { medication: 'Chemo', instructions: '', tab: 'treatment' },
+    { medication: 'Radiation', instructions: '', tab: 'treatment' },
+    { medication: 'Immunotherapy', instructions: '', tab: 'treatment' },
+    { medication: 'Others', instructions: '', tab: 'treatment' },
+    { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
+    { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
+    { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
+    { medication: 'Advice', instructions: '', tab: 'diagnosis' }
   ]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,6 +94,8 @@ export default function EditPrescription() {
   const [validationErrors, setValidationErrors] = useState<{[key: number]: { medication?: string; instructions?: string }}>({});
   const [originalPrescriptionItems, setOriginalPrescriptionItems] = useState<PrescriptionItem[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'treatment' | 'diagnosis'>('treatment');
 
   useEffect(() => {
     // Check if appointment data was passed via navigation state
@@ -163,7 +166,8 @@ export default function EditPrescription() {
           id: item.id,
           medication: item.prescription,
           instructions: item.details,
-          prescriptionId: item.id
+          prescriptionId: item.id,
+          tab: TREATMENT_MEDICATIONS.includes(item.prescription) ? 'treatment' as const : 'diagnosis' as const
         }));
 
         setPrescriptionItems(existingPrescriptions);
@@ -171,16 +175,16 @@ export default function EditPrescription() {
       } else {
         // No existing prescriptions, keep default items
         const defaultItems = [
-          { medication: 'Treatment History', instructions: '' },
-          { medication: 'Surgery', instructions: '' },
-          { medication: 'Chemo', instructions: '' },
-          { medication: 'Radiation', instructions: '' },
-          { medication: 'Immunotherapy', instructions: '' },
-          { medication: 'Others', instructions: '' },
-          { medication: 'Diagnosis', instructions: '' },
-          { medication: 'Instructions', instructions: '' },
-          { medication: 'Final Diagnosis', instructions: '' },
-          { medication: 'Advice', instructions: '' }
+          { medication: 'Treatment History', instructions: '', tab: 'treatment' as const },
+          { medication: 'Surgery', instructions: '', tab: 'treatment' as const },
+          { medication: 'Chemo', instructions: '', tab: 'treatment' as const },
+          { medication: 'Radiation', instructions: '', tab: 'treatment' as const },
+          { medication: 'Immunotherapy', instructions: '', tab: 'treatment' as const },
+          { medication: 'Others', instructions: '', tab: 'treatment' as const },
+          { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' as const },
+          { medication: 'Instructions', instructions: '', tab: 'diagnosis' as const },
+          { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' as const },
+          { medication: 'Advice', instructions: '', tab: 'diagnosis' as const }
         ];
         setPrescriptionItems(defaultItems);
         setOriginalPrescriptionItems(JSON.parse(JSON.stringify(defaultItems))); // Deep copy
@@ -189,24 +193,25 @@ export default function EditPrescription() {
       console.error("Error fetching prescription notes:", err);
       // If API fails, keep default items
       setPrescriptionItems([
-        { medication: 'Treatment History', instructions: '' },
-        { medication: 'Surgery', instructions: '' },
-        { medication: 'Chemo', instructions: '' },
-        { medication: 'Radiation', instructions: '' },
-        { medication: 'Immunotherapy', instructions: '' },
-        { medication: 'Others', instructions: '' },
-        { medication: 'Diagnosis', instructions: '' },
-        { medication: 'Instructions', instructions: '' },
-        { medication: 'Final Diagnosis', instructions: '' },
-        { medication: 'Advice', instructions: '' }
+        { medication: 'Treatment History', instructions: '', tab: 'treatment' },
+        { medication: 'Surgery', instructions: '', tab: 'treatment' },
+        { medication: 'Chemo', instructions: '', tab: 'treatment' },
+        { medication: 'Radiation', instructions: '', tab: 'treatment' },
+        { medication: 'Immunotherapy', instructions: '', tab: 'treatment' },
+        { medication: 'Others', instructions: '', tab: 'treatment' },
+        { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
+        { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
+        { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
+        { medication: 'Advice', instructions: '', tab: 'diagnosis' }
       ]);
     }
   };
 
-  const addPrescriptionItem = () => {
+  const addPrescriptionItem = (tab: 'treatment' | 'diagnosis') => {
     const updatedItems = [...prescriptionItems, {
       medication: '',
-      instructions: ''
+      instructions: '',
+      tab
     }];
     setPrescriptionItems(updatedItems);
     setHasChanges(checkForChanges(updatedItems));
@@ -281,8 +286,9 @@ export default function EditPrescription() {
       console.log(`Validating item ${index}:`, item);
       const itemErrors: { medication?: string; instructions?: string } = {};
 
-      // For custom medications (index >= 10), medication name is required
-      if (index >= 10 && !item.medication.trim()) {
+      // For custom medications (not default ones), medication name is required
+      const isDefaultItem = ['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication);
+      if (!isDefaultItem && !item.medication.trim()) {
         itemErrors.medication = 'Medication name is required';
         hasErrors = true;
       }
@@ -367,6 +373,7 @@ export default function EditPrescription() {
       // Update original items to reflect the saved state
       setOriginalPrescriptionItems(JSON.parse(JSON.stringify(prescriptionItems)));
       setHasChanges(false);
+      setIsEditing(false);
 
       setTimeout(() => {
         if (appointment) {
@@ -519,79 +526,139 @@ export default function EditPrescription() {
               <FileText className="w-5 h-5 mr-2 text-purple-600" />
               Prescription Details
             </h2>
-            <button
-              onClick={addPrescriptionItem}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Medication
-            </button>
+            <div className="flex space-x-3">
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('treatment')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'treatment'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Treatment History
+                </button>
+                <button
+                  onClick={() => setActiveTab('diagnosis')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'diagnosis'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Diagnosis
+                </button>
+              </nav>
+            </div>
           </div>
 
           {/* Prescription Items */}
           <div className="space-y-6">
-            {prescriptionItems.map((item, index) => (
-              <div key={index} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                   <h3 className="text-lg font-semibold text-gray-900">
-                     {index < 10 ? item.medication : 'Add Prescription'}
-                   </h3>
-                   {index >= 10 && (
-                     <button
-                       onClick={() => removePrescriptionItem(index)}
-                       className="text-red-600 hover:text-red-800 p-1"
-                     >
-                       <X className="w-5 h-5" />
-                     </button>
-                   )}
-                 </div>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {activeTab === 'treatment' ? 'Treatment History' : 'Diagnosis'}
+              </h3>
+              <button
+                onClick={() => addPrescriptionItem(activeTab)}
+                disabled={!isEditing}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  isEditing
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+              {prescriptionItems.filter(item => item.tab === activeTab).map((item, globalIndex) => {
+                return (
+                  <div key={globalIndex} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {item.medication || 'Add Prescription'}
+                      </h3>
+                      {item.medication !== 'Treatment History' &&
+                       item.medication !== 'Surgery' &&
+                       item.medication !== 'Chemo' &&
+                       item.medication !== 'Radiation' &&
+                       item.medication !== 'Immunotherapy' &&
+                       item.medication !== 'Others' &&
+                       item.medication !== 'Diagnosis' &&
+                       item.medication !== 'Instructions' &&
+                       item.medication !== 'Final Diagnosis' &&
+                       item.medication !== 'Advice' && (
+                        <button
+                          onClick={() => removePrescriptionItem(globalIndex)}
+                          disabled={!isEditing}
+                          className={`p-1 ${isEditing ? 'text-red-600 hover:text-red-800' : 'text-gray-400 cursor-not-allowed'}`}
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
 
-                <div className="space-y-4">
-                   {index >= 10 && (
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
-                       <input
-                         type="text"
-                         value={item.medication}
-                         onChange={(e) => updatePrescriptionItem(index, 'medication', e.target.value)}
-                         className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                           validationErrors[index]?.medication ? 'border-red-500' : 'border-gray-300'
-                         }`}
-                         placeholder="Enter medication name"
-                         required
-                       />
-                       {validationErrors[index]?.medication && (
-                         <p className="text-red-500 text-sm mt-1">{validationErrors[index].medication}</p>
-                       )}
-                     </div>
-                   )}
-                 </div>
-
-                <div className="mt-4">
-                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                     Description <span className="text-red-500">*</span>
-                     {index < 10 && <span className="text-xs text-gray-500 ml-1">(Required)</span>}
-                   </label>
-                   <textarea
-                     value={item.instructions}
-                     onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
-                     rows={3}
-                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                       validationErrors[index]?.instructions ? 'border-red-500' : 'border-gray-300'
-                     }`}
-                     placeholder="Special instructions for the patient"
-                     required
-                   />
-                   {validationErrors[index]?.instructions && (
-                     <p className="text-red-500 text-sm mt-1">{validationErrors[index].instructions}</p>
-                   )}
-                 </div>
-              </div>
-            ))}
-          </div>
-
-
-
+                    <div className="space-y-4">
+                      {!['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication) && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
+                          <input
+                            type="text"
+                            value={item.medication}
+                            onChange={(e) => updatePrescriptionItem(globalIndex, 'medication', e.target.value)}
+                            disabled={!isEditing}
+                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                              validationErrors[globalIndex]?.medication ? 'border-red-500' : 'border-gray-300'
+                            } ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                            placeholder="Enter medication name"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+  
+                    <div className="mt-4 w-full">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={item.instructions}
+                        onChange={(e) => updatePrescriptionItem(globalIndex, 'instructions', e.target.value)}
+                        rows={3}
+                        disabled={!isEditing}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          validationErrors[globalIndex]?.instructions ? 'border-red-500' : 'border-gray-300'
+                        } ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        placeholder="Special instructions for the patient"
+                        required
+                      />
+                      {validationErrors[globalIndex]?.instructions && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors[globalIndex].instructions}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+  
+  
+  
           {/* Error Message */}
           {error && (
             <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -608,7 +675,7 @@ export default function EditPrescription() {
               </div>
             </div>
           )}
-
+  
           {/* Action Buttons */}
           <div className="mt-8 flex justify-end space-x-4">
             <button
@@ -629,9 +696,9 @@ export default function EditPrescription() {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || Object.keys(validationErrors).length > 0 || !hasChanges}
+              disabled={saving || Object.keys(validationErrors).length > 0 || !hasChanges || !isEditing}
               className={`inline-flex items-center px-6 py-3 text-sm font-medium text-white border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg ${
-                Object.keys(validationErrors).length > 0 || !hasChanges
+                Object.keys(validationErrors).length > 0 || !hasChanges || !isEditing
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
               }`}
@@ -647,14 +714,15 @@ export default function EditPrescription() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  {hasChanges ? 'Save Prescription' : 'No Changes'}
+                  {hasChanges ? 'Save' : 'No Changes'}
                 </>
               )}
             </button>
           </div>
         </div>
-        </div>
-
+      </div>
+      </div>
+  
       <SuccessMessage
         message={successMessage}
         description={successDescription}

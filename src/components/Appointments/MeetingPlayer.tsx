@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { X, Minimize2, Maximize2 } from 'lucide-react';
 import type { RootState } from '../../../store';

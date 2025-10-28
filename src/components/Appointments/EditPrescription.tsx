@@ -56,13 +56,22 @@ interface PrescriptionItem {
   tab: 'treatment' | 'diagnosis';
 }
 
-const TREATMENT_MEDICATIONS = ['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others'];
+
 
 interface PrescriptionNoteResponse {
   id: number;
   appointment_id: number;
   prescription: string;
   details: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TreatmentHistoryResponse {
+  id: number;
+  patient_id: number;
+  treatment_history: string;
+  treatment_history_details: string;
   created_at: string;
   updated_at: string;
 }
@@ -93,7 +102,10 @@ export default function EditPrescription() {
   const [successDescription, setSuccessDescription] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: number]: { medication?: string; instructions?: string }}>({});
   const [originalPrescriptionItems, setOriginalPrescriptionItems] = useState<PrescriptionItem[]>([]);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [hasChanges, setHasChanges] = useState<{
+    treatment: boolean;
+    diagnosis: boolean;
+  }>({ treatment: false, diagnosis: false });
   const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState<'treatment' | 'diagnosis'>('treatment');
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
@@ -103,8 +115,8 @@ export default function EditPrescription() {
     if (location.state?.appointment) {
       setAppointment(location.state.appointment);
       setLoading(false);
-      // Fetch existing prescription notes
-      fetchPrescriptionNotes(location.state.appointment.id);
+      // Load prescription data (treatment histories and diagnosis)
+      loadPrescriptionData(location.state.appointment.id, location.state.appointment.patient_id);
     } else if (id) {
       // Fetch appointment details if not passed via state
       fetchAppointmentDetails();
@@ -138,14 +150,45 @@ export default function EditPrescription() {
       );
 
       setAppointment(response.data.data);
-      // Fetch existing prescription notes
-      fetchPrescriptionNotes(response.data.data.id);
+      // Load prescription data (treatment histories and diagnosis)
+      loadPrescriptionData(response.data.data.id, response.data.data.patient_id);
     } catch (err) {
       console.error("Error fetching appointment details:", err);
       setError("Failed to fetch appointment details. Please try again later.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTreatmentHistories = async (patientId: number) => {
+    try {
+      const response = await httpService.get<{ message: string; data: TreatmentHistoryResponse[] }>(
+        `admin/treatment_histories?patient_id=${patientId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      console.log('Fetched treatment histories:', response.data);
+
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        // Map treatment history data to our format
+        const treatmentItems = response.data.data.map((item: TreatmentHistoryResponse) => ({
+          id: item.id,
+          medication: item.treatment_history,
+          instructions: item.treatment_history_details,
+          prescriptionId: item.id,
+          tab: 'treatment' as const
+        }));
+
+        return treatmentItems;
+      }
+    } catch (err) {
+      console.error("Error fetching treatment histories:", err);
+    }
+    return [];
   };
 
   const fetchPrescriptionNotes = async (appointmentId: number) => {
@@ -163,18 +206,38 @@ export default function EditPrescription() {
 
       if (response.data && response.data.data && response.data.data.length > 0) {
         // Map existing prescription data to our format
-        const existingPrescriptions = response.data.data.map((item: PrescriptionNoteResponse) => ({
+        const diagnosisItems = response.data.data.map((item: PrescriptionNoteResponse) => ({
           id: item.id,
           medication: item.prescription,
           instructions: item.details,
           prescriptionId: item.id,
-          tab: TREATMENT_MEDICATIONS.includes(item.prescription) ? 'treatment' as const : 'diagnosis' as const
+          tab: 'diagnosis' as const
         }));
 
-        setPrescriptionItems(existingPrescriptions);
-        setOriginalPrescriptionItems(JSON.parse(JSON.stringify(existingPrescriptions))); // Deep copy
+        return diagnosisItems;
+      }
+    } catch (err) {
+      console.error("Error fetching prescription notes:", err);
+    }
+    return [];
+  };
+
+  const loadPrescriptionData = async (appointmentId: number, patientId: number) => {
+    try {
+      // Fetch both treatment histories and prescription notes in parallel
+      const [treatmentItems, diagnosisItems] = await Promise.all([
+        fetchTreatmentHistories(patientId),
+        fetchPrescriptionNotes(appointmentId)
+      ]);
+
+      // Combine treatment and diagnosis items
+      const allItems = [...treatmentItems, ...diagnosisItems];
+
+      if (allItems.length > 0) {
+        setPrescriptionItems(allItems);
+        setOriginalPrescriptionItems(JSON.parse(JSON.stringify(allItems))); // Deep copy
       } else {
-        // No existing prescriptions, keep default items
+        // No existing data, use default items
         const defaultItems = [
           { medication: 'Treatment History', instructions: '', tab: 'treatment' as const },
           { medication: 'Surgery', instructions: '', tab: 'treatment' as const },
@@ -191,7 +254,7 @@ export default function EditPrescription() {
         setOriginalPrescriptionItems(JSON.parse(JSON.stringify(defaultItems))); // Deep copy
       }
     } catch (err) {
-      console.error("Error fetching prescription notes:", err);
+      console.error("Error loading prescription data:", err);
       // If API fails, keep default items
       setPrescriptionItems([
         { medication: 'Treatment History', instructions: '', tab: 'treatment' },
@@ -215,7 +278,10 @@ export default function EditPrescription() {
       tab
     }];
     setPrescriptionItems(updatedItems);
-    setHasChanges(checkForChanges(updatedItems));
+    setHasChanges((prev) => ({
+      ...prev,
+      [tab]: checkForChanges(updatedItems, tab),
+    }));
   };
 
   const toggleCardExpansion = (index: number) => {
@@ -232,20 +298,25 @@ export default function EditPrescription() {
     if (prescriptionItems.length > 1) {
       const updatedItems = prescriptionItems.filter((_, i) => i !== index);
       setPrescriptionItems(updatedItems);
-      setHasChanges(checkForChanges(updatedItems));
+      const tab = prescriptionItems[index].tab;
+      setHasChanges((prev) => ({
+        ...prev,
+        [tab]: checkForChanges(updatedItems, tab),
+      }));
     }
   };
 
-  const checkForChanges = (currentItems: PrescriptionItem[]) => {
-    if (originalPrescriptionItems.length === 0) return false;
+  const checkForChanges = (currentItems: PrescriptionItem[], tab: 'treatment' | 'diagnosis') => {
+    const currentTabItems = currentItems.filter((item) => item.tab === tab);
+    const originalTabItems = originalPrescriptionItems.filter((item) => item.tab === tab);
 
-    if (currentItems.length !== originalPrescriptionItems.length) {
+    if (currentTabItems.length !== originalTabItems.length) {
       return true; // Different number of items
     }
 
-    for (let i = 0; i < currentItems.length; i++) {
-      const current = currentItems[i];
-      const original = originalPrescriptionItems[i];
+    for (let i = 0; i < currentTabItems.length; i++) {
+      const current = currentTabItems[i];
+      const original = originalTabItems[i];
 
       if (!original) return true; // New item added
 
@@ -263,9 +334,10 @@ export default function EditPrescription() {
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setPrescriptionItems(updatedItems);
 
-    // Check for changes
-    const hasChanged = checkForChanges(updatedItems);
-    setHasChanges(hasChanged);
+    // Check for changes in the specific tab
+    const tab = updatedItems[index].tab;
+    const hasChanged = checkForChanges(updatedItems, tab);
+    setHasChanges((prev) => ({ ...prev, [tab]: hasChanged }));
 
     // Clear validation error for this field
     if (validationErrors[index] && (field === 'medication' || field === 'instructions')) {
@@ -327,22 +399,15 @@ export default function EditPrescription() {
     return !hasErrors;
   };
 
-  const handleSave = async () => {
-    console.log('Handle save called');
-    console.log('Current prescription items:', prescriptionItems);
+  const handleSaveTreatment = async () => {
+    console.log('Handle save treatment called');
 
-    // Validate required fields
-    const isValid = validatePrescriptionItems();
-    console.log('Validation result:', isValid);
-    console.log('Validation errors after validation:', validationErrors);
+    // Validate required fields for treatment items only
+    const isValid = validatePrescriptionItemsForTab('treatment');
 
     if (!isValid) {
-      console.log('Validation failed, showing error');
-      setError('Please fill in all required fields');
-
-      // Scroll to top to show error message
+      setError('Please fill in all required fields for treatment history');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
       return;
     }
 
@@ -350,21 +415,84 @@ export default function EditPrescription() {
     setError(null);
 
     try {
-      // Format prescription data according to API requirements
-      const prescriptionData = prescriptionItems.map(item => ({
+      // Format treatment data according to the new API format
+      const treatmentItems = prescriptionItems.filter(item => item.tab === 'treatment');
+      const treatmentData = treatmentItems.map(item => ({
+        treatment_history: item.medication,
+        treatment_history_details: item.instructions
+      }));
+
+      const requestBody = {
+        patient_id: appointment?.patient_id,
+        treatment_history: treatmentData
+      };
+
+      console.log('Saving treatment history:', requestBody);
+
+      // Use the new treatment_histories endpoint
+      await httpService.post(
+        'admin/treatment_histories',
+        requestBody,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+
+      console.log('Treatment history saved successfully');
+
+      setSuccessMessage('Treatment History Saved');
+      setSuccessDescription('The treatment history has been successfully saved.');
+      setShowSuccess(true);
+
+      // Update original items to reflect the saved state
+      setOriginalPrescriptionItems(JSON.parse(JSON.stringify(prescriptionItems)));
+      setHasChanges(prev => ({ ...prev, treatment: false }));
+
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Error saving treatment history:", err);
+      setError("Failed to save treatment history. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveDiagnosis = async () => {
+    console.log('Handle save diagnosis called');
+
+    // Validate required fields for diagnosis items only
+    const isValid = validatePrescriptionItemsForTab('diagnosis');
+
+    if (!isValid) {
+      setError('Please fill in all required fields for diagnosis');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      // Format diagnosis data
+      const diagnosisItems = prescriptionItems.filter(item => item.tab === 'diagnosis');
+      const diagnosisData = diagnosisItems.map(item => ({
         prescription: item.medication,
         details: item.instructions
       }));
 
       const requestBody = {
         appointment_id: appointment?.id,
-        prescription: prescriptionData
+        prescription: diagnosisData
       };
 
-      console.log('Saving prescription:', requestBody);
+      console.log('Saving diagnosis:', requestBody);
 
-      // Always use POST - the API should handle creating/updating
-      const response = await httpService.post(
+      await httpService.post(
         'admin/prescription_notes',
         requestBody,
         {
@@ -375,29 +503,67 @@ export default function EditPrescription() {
         }
       );
 
-      console.log('Prescription saved successfully:', response.data);
+      console.log('Diagnosis saved successfully');
 
-      setSuccessMessage('Prescription Saved');
-      setSuccessDescription('The prescription has been successfully saved.');
+      setSuccessMessage('Diagnosis Saved');
+      setSuccessDescription('The diagnosis has been successfully saved.');
       setShowSuccess(true);
 
       // Update original items to reflect the saved state
       setOriginalPrescriptionItems(JSON.parse(JSON.stringify(prescriptionItems)));
-      setHasChanges(false);
+      setHasChanges({ treatment: false, diagnosis: false });
 
       setTimeout(() => {
-        if (appointment) {
-          const encryptedId = encryptId(appointment.id);
-          navigate(`/appointments/${encryptedId}`, { state: { appointment } });
-        }
+        setShowSuccess(false);
       }, 2000);
     } catch (err) {
-      console.error("Error saving prescription:", err);
-      setError("Failed to save prescription. Please try again.");
+      console.error("Error saving diagnosis:", err);
+      setError("Failed to save diagnosis. Please try again.");
     } finally {
       setSaving(false);
     }
   };
+
+  const hasValidationErrorsInTab = (tab: 'treatment' | 'diagnosis') => {
+    return prescriptionItems.some((item, index) => item.tab === tab && validationErrors[index]);
+  };
+
+  const validatePrescriptionItemsForTab = (tab: 'treatment' | 'diagnosis') => {
+    const tabItems = prescriptionItems.filter(item => item.tab === tab);
+    const errors: {[key: number]: { medication?: string; instructions?: string }} = {};
+    let hasErrors = false;
+
+    tabItems.forEach((item, index) => {
+      const itemErrors: { medication?: string; instructions?: string } = {};
+
+      // For custom medications (not default ones), medication name is required
+      const isDefaultItem = [
+        'Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others',
+        'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'
+      ].includes(item.medication);
+
+      if (!isDefaultItem && !item.medication.trim()) {
+        itemErrors.medication = 'Medication name is required';
+        hasErrors = true;
+      }
+
+      // Instructions are always required
+      const trimmedInstructions = item.instructions ? item.instructions.trim() : '';
+      if (!trimmedInstructions || trimmedInstructions.length === 0) {
+        itemErrors.instructions = 'Description is required';
+        hasErrors = true;
+      }
+
+      if (Object.keys(itemErrors).length > 0) {
+        errors[index] = itemErrors;
+      }
+    });
+
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
+
 
   if (loading) {
     return (
@@ -583,18 +749,6 @@ export default function EditPrescription() {
               <h3 className="text-lg font-semibold text-gray-900">
                 {activeTab === 'treatment' ? 'Treatment History' : 'Diagnosis'}
               </h3>
-              <button
-                onClick={() => addPrescriptionItem(activeTab)}
-                disabled={!isEditing}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  isEditing
-                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
-              </button>
             </div>
             <div className="space-y-4">
               {prescriptionItems.map((item, globalIndex) => item.tab === activeTab && (
@@ -704,26 +858,22 @@ export default function EditPrescription() {
           {/* Action Buttons */}
           <div className="mt-8 flex justify-end space-x-4">
             <button
-              onClick={() => {
-                console.log('Cancel button clicked, appointment:', appointment);
-                if (appointment) {
-                  const encryptedId = encryptId(appointment.id);
-                  console.log('Navigating to:', `/appointments/${encryptedId}`);
-                  navigate(`/appointments/${encryptedId}`, { state: { appointment } });
-                } else {
-                  console.log('No appointment data, navigating to /appointments');
-                  navigate('/appointments');
-                }
-              }}
-              className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
+              onClick={() => addPrescriptionItem(activeTab)}
+              disabled={!isEditing}
+              className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                isEditing
+                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
-              Cancel
+              <Plus className="w-4 h-4 mr-2" />
+              Add {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
             </button>
             <button
-              onClick={handleSave}
-              disabled={saving || Object.keys(validationErrors).length > 0 || !hasChanges || !isEditing}
-              className={`inline-flex items-center px-6 py-3 text-sm font-medium text-white border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg ${
-                Object.keys(validationErrors).length > 0 || !hasChanges || !isEditing
+              onClick={activeTab === 'treatment' ? handleSaveTreatment : handleSaveDiagnosis}
+              disabled={saving || hasValidationErrorsInTab(activeTab) || !isEditing || !hasChanges[activeTab]}
+              className={`inline-flex items-center px-6 py-2 text-sm font-medium text-white border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg ${
+                hasValidationErrorsInTab(activeTab) || !isEditing || !hasChanges[activeTab]
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
               }`}
@@ -739,7 +889,7 @@ export default function EditPrescription() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  {hasChanges ? 'Save' : 'No Changes'}
+                  Save {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
                 </>
               )}
             </button>

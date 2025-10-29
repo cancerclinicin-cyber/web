@@ -205,21 +205,57 @@ export default function EditPrescription() {
       console.log('Fetched prescription notes:', response.data);
 
       if (response.data && response.data.data && response.data.data.length > 0) {
-        // Map existing prescription data to our format
-        const diagnosisItems = response.data.data.map((item: PrescriptionNoteResponse) => ({
-          id: item.id,
-          medication: item.prescription,
-          instructions: item.details,
-          prescriptionId: item.id,
-          tab: 'diagnosis' as const
-        }));
+        // Create default diagnosis items
+        const defaultDiagnosisItems: PrescriptionItem[] = [
+          { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
+          { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
+          { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
+          { medication: 'Advice', instructions: '', tab: 'diagnosis' }
+        ];
 
-        return diagnosisItems;
+        // Populate default items with API data based on prescription field
+        const populatedItems = defaultDiagnosisItems.map(defaultItem => {
+          const matchingApiItem = response.data.data.find(apiItem =>
+            apiItem.prescription.toLowerCase() === defaultItem.medication.toLowerCase()
+          );
+
+          if (matchingApiItem) {
+            return {
+              ...defaultItem,
+              id: matchingApiItem.id,
+              instructions: matchingApiItem.details,
+              prescriptionId: matchingApiItem.id
+            };
+          }
+
+          return defaultItem;
+        });
+
+        // Add any additional custom prescription items from API that don't match defaults
+        const customItems = response.data.data
+          .filter(apiItem => !['diagnosis', 'instructions', 'final diagnosis', 'advice'].includes(apiItem.prescription.toLowerCase()))
+          .map(apiItem => ({
+            id: apiItem.id,
+            medication: apiItem.prescription,
+            instructions: apiItem.details,
+            prescriptionId: apiItem.id,
+            tab: 'diagnosis' as const
+          }));
+
+        return [...populatedItems, ...customItems];
       }
     } catch (err) {
       console.error("Error fetching prescription notes:", err);
     }
-    return [];
+
+    // Return default diagnosis items if no API data
+    const defaultDiagnosisItems: PrescriptionItem[] = [
+      { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
+      { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
+      { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
+      { medication: 'Advice', instructions: '', tab: 'diagnosis' }
+    ];
+    return defaultDiagnosisItems;
   };
 
   const loadPrescriptionData = async (appointmentId: number, patientId: number) => {
@@ -238,36 +274,47 @@ export default function EditPrescription() {
         setOriginalPrescriptionItems(JSON.parse(JSON.stringify(allItems))); // Deep copy
       } else {
         // No existing data, use default items
-        const defaultItems = [
+        const defaultTreatmentItems = [
           { medication: 'Treatment History', instructions: '', tab: 'treatment' as const },
           { medication: 'Surgery', instructions: '', tab: 'treatment' as const },
           { medication: 'Chemo', instructions: '', tab: 'treatment' as const },
           { medication: 'Radiation', instructions: '', tab: 'treatment' as const },
           { medication: 'Immunotherapy', instructions: '', tab: 'treatment' as const },
-          { medication: 'Others', instructions: '', tab: 'treatment' as const },
+          { medication: 'Others', instructions: '', tab: 'treatment' as const }
+        ];
+
+        const defaultDiagnosisItems = [
           { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' as const },
           { medication: 'Instructions', instructions: '', tab: 'diagnosis' as const },
           { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' as const },
           { medication: 'Advice', instructions: '', tab: 'diagnosis' as const }
         ];
+
+        const defaultItems = [...defaultTreatmentItems, ...defaultDiagnosisItems];
         setPrescriptionItems(defaultItems);
         setOriginalPrescriptionItems(JSON.parse(JSON.stringify(defaultItems))); // Deep copy
       }
     } catch (err) {
       console.error("Error loading prescription data:", err);
       // If API fails, keep default items
-      setPrescriptionItems([
+      const defaultTreatmentItems: PrescriptionItem[] = [
         { medication: 'Treatment History', instructions: '', tab: 'treatment' },
         { medication: 'Surgery', instructions: '', tab: 'treatment' },
         { medication: 'Chemo', instructions: '', tab: 'treatment' },
         { medication: 'Radiation', instructions: '', tab: 'treatment' },
         { medication: 'Immunotherapy', instructions: '', tab: 'treatment' },
-        { medication: 'Others', instructions: '', tab: 'treatment' },
+        { medication: 'Others', instructions: '', tab: 'treatment' }
+      ];
+
+      const defaultDiagnosisItems: PrescriptionItem[] = [
         { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
         { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
         { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
         { medication: 'Advice', instructions: '', tab: 'diagnosis' }
-      ]);
+      ];
+
+      const defaultItems = [...defaultTreatmentItems, ...defaultDiagnosisItems];
+      setPrescriptionItems(defaultItems);
     }
   };
 
@@ -478,7 +525,7 @@ export default function EditPrescription() {
     setError(null);
 
     try {
-      // Format diagnosis data
+      // Format diagnosis data according to the API format
       const diagnosisItems = prescriptionItems.filter(item => item.tab === 'diagnosis');
       const diagnosisData = diagnosisItems.map(item => ({
         prescription: item.medication,

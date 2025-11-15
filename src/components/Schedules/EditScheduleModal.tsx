@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
-import httpService from '../../common/utils/httpService';
 import { X } from 'lucide-react';
 import ErrorMessage from '../common/ErrorMessage';
 
@@ -68,22 +67,28 @@ export default function EditScheduleModal({
 
     setLoading(true);
     try {
-      await httpService.put(
-        'admin/schedules/update_by_date/',
-        {
-          scheduled_date: new Date().toISOString().split('T')[0], // Today's date
-          schedule: {
-            id: schedule.id,
-            start_time: startTime + ':00',
-            end_time: endTime + ':00'
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+      myHeaders.append("Authorization", `Bearer ${accessToken}`);
+
+      const raw = JSON.stringify({
+        "day": schedule.day,
+        "schedule": {
+          "start_time": startTime,
+          "end_time": endTime
         }
-      );
+      });
+
+      const requestOptions = {
+        method: "PUT",
+        headers: myHeaders,
+        body: raw
+      };
+
+      const response = await fetch("http://localhost:3000/api/v1/admin/schedules/update_by_day", requestOptions);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       onSuccess();
     } catch (err: unknown) {

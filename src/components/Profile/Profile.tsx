@@ -104,7 +104,9 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
       });
       setEditedServiceData({
         initial_consultation_price: response.data.consultation_service.initial_consultation_price,
-        follow_up_consultation_price: response.data.consultation_service.follow_up_consultation_price
+        follow_up_consultation_price: response.data.consultation_service.follow_up_consultation_price,
+        initial_slot_duration_minutes: response.data.consultation_service.initial_slot_duration_minutes,
+        follow_up_slot_duration_minutes: response.data.consultation_service.follow_up_slot_duration_minutes,
       });
     } catch (err: any) {
       console.error("Profile fetch error:", err);
@@ -123,7 +125,9 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
       });
       setEditedServiceData({
         initial_consultation_price: profileData.consultation_service.initial_consultation_price,
-        follow_up_consultation_price: profileData.consultation_service.follow_up_consultation_price
+        follow_up_consultation_price: profileData.consultation_service.follow_up_consultation_price,
+        initial_slot_duration_minutes: profileData.consultation_service.initial_slot_duration_minutes,
+        follow_up_slot_duration_minutes: profileData.consultation_service.follow_up_slot_duration_minutes,
       });
     }
   };
@@ -138,7 +142,9 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
       });
       setEditedServiceData({
         initial_consultation_price: profileData.consultation_service.initial_consultation_price,
-        follow_up_consultation_price: profileData.consultation_service.follow_up_consultation_price
+        follow_up_consultation_price: profileData.consultation_service.follow_up_consultation_price,
+        initial_slot_duration_minutes: profileData.consultation_service.initial_slot_duration_minutes,
+        follow_up_slot_duration_minutes: profileData.consultation_service.follow_up_slot_duration_minutes,
       });
     }
   };
@@ -165,8 +171,8 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
         formdata.append("initial_consultation_price", editedServiceData.initial_consultation_price?.toString() || "0");
         formdata.append("follow_up_consultation_price", editedServiceData.follow_up_consultation_price?.toString() || "0");
         // Include non-editable fields as per API requirements
-        formdata.append("initial_slot_duration_minutes", profileData?.consultation_service.initial_slot_duration_minutes.toString() || "0");
-        formdata.append("follow_up_slot_duration_minutes", profileData?.consultation_service.follow_up_slot_duration_minutes.toString() || "0");
+        formdata.append("initial_slot_duration_minutes", editedServiceData.initial_slot_duration_minutes?.toString() || "0");
+        formdata.append("follow_up_slot_duration_minutes", editedServiceData.follow_up_slot_duration_minutes?.toString() || "0");
       }
       
       // Add logo if selected
@@ -489,12 +495,27 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
                           
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Initial Slot Duration (Minutes)
+                            </label>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editedServiceData?.initial_slot_duration_minutes || ""}
+                                onChange={(e) => handleServiceInputChange("initial_slot_duration_minutes", e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            ) : (
+                              <p className="py-2.5 text-gray-900 bg-white px-4 rounded-lg border border-gray-200 font-medium">
+                                {profileData.consultation_service.initial_slot_duration_minutes}
+                              </p>
+                            )}
+                            {/* <label className="block text-sm font-medium text-gray-700 mb-2">
                               Initial Slot Duration
                             </label>
                             <p className="py-2.5 text-gray-900 bg-white px-4 rounded-lg border border-gray-200">
                               {profileData.consultation_service.initial_slot_duration_minutes} minutes
                             </p>
-                            <p className="text-sm text-gray-500 mt-1">Slot duration cannot be changed</p>
+                            <p className="text-sm text-gray-500 mt-1">Slot duration cannot be changed</p> */}
                           </div>
                         </div>
                       </div>
@@ -521,13 +542,28 @@ export default function ProfileModal({ isOpen, onClose, access_token }: ProfileM
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {/* <label className="block text-sm font-medium text-gray-700 mb-2">
                               Follow-up Slot Duration
                             </label>
                             <p className="py-2.5 text-gray-900 bg-white px-4 rounded-lg border border-gray-200">
                               {profileData.consultation_service.follow_up_slot_duration_minutes} minutes
                             </p>
-                            <p className="text-sm text-gray-500 mt-1">Slot duration cannot be changed</p>
+                            <p className="text-sm text-gray-500 mt-1">Slot duration cannot be changed</p> */}
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Follow-up Slot Duration (Minutes)
+                            </label>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editedServiceData?.follow_up_slot_duration_minutes || ""}
+                                onChange={(e) => handleServiceInputChange("follow_up_slot_duration_minutes", e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            ) : (
+                              <p className="py-2.5 text-gray-900 bg-white px-4 rounded-lg border border-gray-200 font-medium">
+                                {profileData.consultation_service.follow_up_slot_duration_minutes}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

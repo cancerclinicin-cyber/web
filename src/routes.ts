@@ -52,6 +52,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export const routes: Route[] = [
   // Public routes (no authentication required)
   { path: '/', element: React.createElement(NewAppointment) },
+  { path: '/register', element: React.createElement(NewAppointment) },
   { path: '/login', element: React.createElement(Login) },
 
   // Protected routes (authentication required)

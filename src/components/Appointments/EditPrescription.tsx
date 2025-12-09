@@ -111,6 +111,7 @@ export default function EditPrescription() {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
   useEffect(() => {
+    setActiveTab('treatment');
     // Check if appointment data was passed via navigation state
     if (location.state?.appointment) {
       setAppointment(location.state.appointment);
@@ -210,7 +211,11 @@ export default function EditPrescription() {
           { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
           { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
           { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
-          { medication: 'Advice', instructions: '', tab: 'diagnosis' }
+          { medication: 'Advice', instructions: '', tab: 'diagnosis' },
+          { medication: 'Surgery', instructions: '', tab: 'treatment' },
+          { medication: 'Chemo', instructions: '', tab: 'treatment' },
+          { medication: 'Radiation', instructions: '', tab: 'treatment' },
+          { medication: 'Immunotherapy', instructions: '', tab: 'treatment' },
         ];
 
         // Populate default items with API data based on prescription field
@@ -250,10 +255,19 @@ export default function EditPrescription() {
 
     // Return default diagnosis items if no API data
     const defaultDiagnosisItems: PrescriptionItem[] = [
+      { medication: 'Treatment History', instructions: '', tab: 'treatment' },
+      { medication: 'Surgery History', instructions: '', tab: 'diagnosis' },
+      { medication: 'Chemo History', instructions: '', tab: 'diagnosis' },
+      { medication: 'Radiation History', instructions: '', tab: 'diagnosis' },
+      { medication: 'Immunotherapy History', instructions: '', tab: 'diagnosis' },
       { medication: 'Diagnosis', instructions: '', tab: 'diagnosis' },
       { medication: 'Instructions', instructions: '', tab: 'diagnosis' },
       { medication: 'Final Diagnosis', instructions: '', tab: 'diagnosis' },
-      { medication: 'Advice', instructions: '', tab: 'diagnosis' }
+      { medication: 'Advice', instructions: '', tab: 'diagnosis' },
+      { medication: 'Surgery', instructions: '', tab: 'diagnosis' },
+      { medication: 'Chemo', instructions: '', tab: 'diagnosis' },
+      { medication: 'Radiation', instructions: '', tab: 'diagnosis' },
+      { medication: 'Immunotherapy', instructions: '', tab: 'diagnosis' },
     ];
     return defaultDiagnosisItems;
   };
@@ -292,6 +306,7 @@ export default function EditPrescription() {
 
         const defaultItems = [...defaultTreatmentItems, ...defaultDiagnosisItems];
         setPrescriptionItems(defaultItems);
+        console.log("Default Items", defaultItems);
         setOriginalPrescriptionItems(JSON.parse(JSON.stringify(defaultItems))); // Deep copy
       }
     } catch (err) {
@@ -314,6 +329,7 @@ export default function EditPrescription() {
       ];
 
       const defaultItems = [...defaultTreatmentItems, ...defaultDiagnosisItems];
+      console.log("Default Items", defaultItems);
       setPrescriptionItems(defaultItems);
     }
   };
@@ -417,7 +433,10 @@ export default function EditPrescription() {
       const itemErrors: { medication?: string; instructions?: string } = {};
 
       // For custom medications (not default ones), medication name is required
-      const isDefaultItem = ['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication);
+      const isDefaultItem = [
+        'Treatment History', 'Surgery History', 'Chemo History', 'Radiation History', 'Immunotherapy History',
+        'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis',
+        'Advice'].includes(item.medication);
       if (!isDefaultItem && !item.medication.trim()) {
         itemErrors.medication = 'Medication name is required';
         hasErrors = true;
@@ -586,6 +605,7 @@ export default function EditPrescription() {
       // For custom medications (not default ones), medication name is required
       const isDefaultItem = [
         'Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others',
+        'Surgery History', 'Chemo History', 'Radiation History', 'Immunotherapy History',
         'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'
       ].includes(item.medication);
 
@@ -747,7 +767,7 @@ export default function EditPrescription() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-purple-600" />
-              Prescription Details
+              Medical Record
             </h2>
             <div className="flex space-x-3">
               {!isEditing && (
@@ -763,7 +783,7 @@ export default function EditPrescription() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="mb-6">
+          {/* <div className="mb-6">
             <div className="border-b border-gray-200">
               <nav className="-mb-px flex space-x-8">
                 <button
@@ -788,17 +808,17 @@ export default function EditPrescription() {
                 </button>
               </nav>
             </div>
-          </div>
+          </div> */}
 
           {/* Prescription Items */}
           <div className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
+            {/* <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {activeTab === 'treatment' ? 'Treatment History' : 'Diagnosis'}
               </h3>
-            </div>
+            </div> */}
             <div className="space-y-4">
-              {prescriptionItems.map((item, globalIndex) => item.tab === activeTab && (
+              {prescriptionItems.map((item, globalIndex) => (
                   <div key={globalIndex} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                     <button
                       onClick={() => toggleCardExpansion(globalIndex)}
@@ -809,6 +829,10 @@ export default function EditPrescription() {
                       </h3>
                       <div className="flex items-center space-x-2">
                         {item.medication !== 'Treatment History' &&
+                         item.medication !== 'Surgery History' &&
+                         item.medication !== 'Chemo History' &&
+                         item.medication !== 'Radiation History' &&
+                         item.medication !== 'Immunotherapy History' &&
                          item.medication !== 'Surgery' &&
                          item.medication !== 'Chemo' &&
                          item.medication !== 'Radiation' &&
@@ -840,7 +864,7 @@ export default function EditPrescription() {
                     {expandedCards.has(globalIndex) && (
                       <div className="px-6 pb-6">
                         <div className="space-y-4">
-                          {!['Treatment History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication) && (
+                          {!['Treatment History', 'Surgery History', 'Chemo History', 'Radiation History', 'Immunotherapy History', 'Surgery', 'Chemo', 'Radiation', 'Immunotherapy', 'Others', 'Diagnosis', 'Instructions', 'Final Diagnosis', 'Advice'].includes(item.medication) && (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">Medication Name *</label>
                               <input
@@ -914,7 +938,7 @@ export default function EditPrescription() {
               }`}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
+              Add Prescription
             </button>
             <button
               onClick={activeTab === 'treatment' ? handleSaveTreatment : handleSaveDiagnosis}
@@ -936,7 +960,7 @@ export default function EditPrescription() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Save {activeTab === 'treatment' ? 'Treatment' : 'Diagnosis'}
+                  Save
                 </>
               )}
             </button>

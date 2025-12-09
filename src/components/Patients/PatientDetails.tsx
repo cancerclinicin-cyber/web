@@ -6,8 +6,8 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import httpService from '../../common/utils/httpService';
 import Header from '../Layouts/Header/Header';
-import { Phone, Mail, MapPin } from "lucide-react";
-import { decryptId } from '../../common/utils/encryption';
+import { Phone, Mail, MapPin, FileText } from "lucide-react";
+import { decryptId, encryptId } from '../../common/utils/encryption';
 
 interface Appointment {
   id: number;
@@ -449,6 +449,17 @@ export default function PatientDetails() {
                       Active
                     </span>
                   </div>
+                  { patient.appointments.length > 0 &&
+                  <div className="bg-white/70 rounded-lg p-3">
+                    <button
+                      onClick={() => navigate(`/appointments/${encryptId(patient.appointments[0].id)}/edit-prescription`, { state: {appointment: patient.appointments[0]} })}
+                      className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-medium rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Edit Prescription
+                    </button>
+                  </div>
+                  }
                 </div>
               </div>
             </div>

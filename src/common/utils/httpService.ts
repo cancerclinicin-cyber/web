@@ -4,7 +4,7 @@ import config from "../../../configLoader";
 
 // Create an Axios instance with default config
 const instance = axios.create({
-  baseURL: config.APLURL,
+  baseURL: config.API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

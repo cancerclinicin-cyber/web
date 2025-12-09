@@ -219,7 +219,7 @@ export default function Header() {
             >
               <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center shadow overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&h=200&q=80"
+                  src="https://uniquetimes.org/wp-content/uploads/2024/02/Image-scaled-e1707555011922.jpg"
                   alt="Doctor profile"
                   className="h-full w-full object-cover"
                 />

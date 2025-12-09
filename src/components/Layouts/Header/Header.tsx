@@ -239,7 +239,7 @@ export default function Header() {
                     setIsChangePasswordOpen(true);
                     setIsProfileOpen(false);
                   }}
-                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg mx-2"
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg"
                 >
                   <Settings className="h-4 w-4" />
                   <span>Change Password</span>
@@ -249,7 +249,7 @@ export default function Header() {
                     setIsProfileModalOpen(true);
                     setIsProfileOpen(false);
                   }}
-                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg mx-2"
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-green-100 transition-colors rounded-lg"
                 >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
@@ -257,7 +257,7 @@ export default function Header() {
                 <hr className="my-2 border-green-100" />
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors rounded-lg mx-2"
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors rounded-lg"
                 >
                   <span>Logout</span>
                 </button>

@@ -5,6 +5,9 @@ import { User, FileText, Clock, Upload, X, Check, CheckCircle, Calendar } from "
 import { differenceInYears } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import 'react-phone-number-input/style.css';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import{ type E164Number } from 'libphonenumber-js/core';
 import config from "../../../configLoader";
 
 // Firefox-specific CSS fixes for datepicker
@@ -130,9 +133,9 @@ export default function NewAppointment() {
     let processedValue = value;
 
     // For phone number field, only allow numeric characters
-    if (name === "phoneNumber") {
-      processedValue = value.replace(/\D/g, ''); // Remove all non-numeric characters
-    }
+    // if (name === "phoneNumber") {
+    //   processedValue = value.replace(/\D/g, ''); // Remove all non-numeric characters
+    // }
 
     setFormData(prev => ({
       ...prev,
@@ -204,6 +207,16 @@ export default function NewAppointment() {
     // More comprehensive email validation
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
+  };
+
+  const validatePhoneNumber = (phone_number: E164Number) => {
+    console.log(phone_number);
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.phoneNumber;
+      if (phone_number && !isValidPhoneNumber(phone_number)) newErrors.phoneNumber = "Invalid phone number";
+      return newErrors;
+    });
   };
 
   const validateForm = () => {
@@ -861,7 +874,7 @@ export default function NewAppointment() {
                     <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                       Phone Number *
                     </label>
-                    <input
+                    {/* <input
                       id="phoneNumber"
                       name="phoneNumber"
                       type="tel"
@@ -870,6 +883,17 @@ export default function NewAppointment() {
                       placeholder="9876543210"
                       maxLength={10}
                       pattern="[0-9]{10}"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                        errors.phoneNumber ? "border-red-500" : "border-gray-300"
+                      }`}
+                    /> */}
+                    <PhoneInput
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      placeholder="Enter phone number"
+                      value={formData.phoneNumber}
+                      onChange={validatePhoneNumber}
+                      defaultCountry="IN"
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
                         errors.phoneNumber ? "border-red-500" : "border-gray-300"
                       }`}
